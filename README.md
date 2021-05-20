@@ -1,5 +1,7 @@
 # send
 
+# DO NOT USE THIS YET. IT IS SUPER BROKEN AT THE MOMENT.
+
 Crystal looks and feels a lot like Ruby. However, pieces of the metaprogramming toolkits between the two languages vary quite widely. The high level difference is that Ruby makes extensive use of facilities like `eval`, `method_missing`, and `send` to do its dynamic magic. And while Crystal does support `method_missing`, because of its compiled nature, most of Crystal's dynamic magic comes from the use of macros. Crystal does not support `eval` or  `send`.
 
 However...
