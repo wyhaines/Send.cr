@@ -1,15 +1,26 @@
 require "benchmark"
 
+annotation SendViaProc
+end
+
+annotation SendViaRecord
+end
+
 module Send
   VERSION = "0.1.0"
 
-  # This macro will generate a set of lookup tables that can be used to
-  # lookup the callsite to use to invoke a given method dynamically.
-  # The tables are organized
+  macro build_type_label_lookups
+    MethodTypeLabel = {
+    {% for method in @type.methods %}
+      {{method.args.symbolize}} => {{ method.args.map { |arg| arg.restriction.id.gsub(/ \| /, "_").id }.join("__") }},
+    {% end %}
+    }
+  end
+
   macro build_type_lookups
-    {% for restriction in @type.methods.map { |method| method.args.map { |arg| arg.restriction.id.tr(" ","").tr("|","_").id }.join("") }.uniq %}
-      SendLookup{{ restriction.id }} = {
-        {% for method in @type.methods %}{% if restriction == method.args.map { |arg| arg.restriction.id.tr(" ","").tr("|","_").id }.join("") %}"{{ method.name }}": Send_{{ method.name }}{{ restriction.id.tr(" ","").tr("|","_").id }},
+    {% for restriction in @type.methods.map { |method| MethodTypeLabel[method.args.symbolize] }.uniq %}
+      SendLookup___{{ restriction.id }} = {
+        {% for method in @type.methods %}{% if restriction == MethodTypeLabel[method.args.symbolize] %}"{{ method.name }}": Send_{{ method.name }}_{{ restriction.gsub(/::/,"_").id }},
         {% end %}{% end %}
       }
     {% end %}
@@ -17,9 +28,9 @@ module Send
 
   macro p_build_type_lookups
     <<-ECODE
-    {% for restriction in @type.methods.map { |method| method.args.map { |arg| arg.restriction.id.tr(" ","").tr("|","_").id }.join("") }.uniq %}
-      SendLookup{{ restriction.id }} = {
-        {% for method in @type.methods %}{% if restriction == method.args.map { |arg| arg.restriction.id.tr(" ","").tr("|","_").id }.join("") %}"{{ method.name }}": Send_{{ method.name }}{{ restriction.id.tr(" ","").tr("|","_").id }},
+    {% for restriction in @type.methods.map { |method| MethodTypeLabel[method.args.symbolize] }.uniq %}
+      SendLookup___{{ restriction.id }} = {
+        {% for method in @type.methods %}{% if restriction == MethodTypeLabel[method.args.symbolize] %}"{{ method.name }}": Send_{{ method.name }}{{ restriction.id }},
         {% end %}{% end %}
       }
     {% end %}
@@ -35,158 +46,113 @@ module Send
   # it calls the method using the arguments that were used to create the
   # record.
   #
-  # This macro creates a set of `record` structs to use to provide a callsite
-  # and to encapsulate the arguments for the method.
-  macro build_method_records
+  # This macro builds the callsites to send methods to. It defaults to using
+  # record structs to implement the callsites, but if passed a `true` when the
+  # macro is invoked, it will build the callsite using a Proc instead. Callsites
+  # built with a record are as fast as direct method invocations, when compiled
+  # with `--release`, but they suffer from some type restrictions that the Proc
+  # method do not suffer from. Namely, there are some types, such as `Number`,
+  # which can be used in a type or type union on a Proc, but which can not be
+  # used on an instance variable, which record-type callsites use. However,
+  # dynamic dispatch using Proc-type callsites is slower than with record-type
+  # callsites.
+  macro build_callsites
+    {% use_procs = !@type.annotations(SendViaProc).empty? %}
     {% for method in @type.methods %}
-      {% inner_args = method.args %}
-      {% inner_method_name = method.name %}
-      record Send_{{ inner_method_name }}{{ inner_args.map { |arg| arg.restriction.id.tr(" ","").tr("|","_").id }.join("").id }}, obj : {{ @type.id }}, {{ inner_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
-        def call
-          obj.{{ inner_method_name }}({{ inner_args.map { |method| method.name }.join(", ").id }})
+      {% method_args = method.args %}
+      {% method_name = method.name %}
+      {% if use_procs == true %}
+        Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/,"_").id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
+          obj.{{ method_name }}({{ method_args.map { |method| method.name }.join(", ").id }})
         end
-      end
+      {% else %}
+        record Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/,"_").id }}, obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
+          def call
+            obj.{{ method_name }}({{ method_args.map { |method| method.name }.join(", ").id }})
+          end
+        end
+      {% end %}
     {% end %}
   end
 
-  # This macro will create a set of Procs that wrap the calls to the methods.
-  macro build_method_procs
+  macro p_build_callsites
+    <<-ECODE
+    {% use_procs = !@type.annotations(SendViaProc).empty? %}
     {% for method in @type.methods %}
-      {% inner_args = method.args %}
-      {% inner_method_name = method.name %}
-      Send_{{ inner_method_name }}{{ inner_args.map { |arg| arg.restriction.id.tr(" ","").tr("|","_").id }.join("").id }} = ->(obj : {{ @type.id }}, {{ inner_args.map { |arg| "#{arg.name} : #{arg.restriction.id.tr(" ","").tr("|","_").id}" }.join(", ").id }}) do
-          obj.{{ inner_method_name }}({{ inner_args.map { |method| method.name }.join(", ").id }})
-      end
+      {% method_args = method.args %}
+      {% method_name = method.name %}
+      {% if use_procs == true %}
+        Send_{{ method_name }}{{ MethodTypeLabel[method.args.symbolize].id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
+          obj.{{ method_name }}({{ method_args.map { |method| method.name }.join(", ").id }})
+        end
+      {% else %}
+        record Send_{{ method_name }}{{ MethodTypeLabel[method.args.symbolize].id }}, obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
+          def call
+            obj.{{ method_name }}({{ method_args.map { |method| method.name }.join(", ").id }})
+          end
+        end
+      {% end %}
+    {% end %}
+    ECODE
+  end
+
+  # Send needs to find the right method to call, in a world where type unions exist and are
+  # common. This may not be the right approach, but it is an approach, and it what I am starting
+  # with.
+  #
+  # The basic problem is that if, say, you have a method that takes a `String | Int32`, and you
+  # also have a method that takes only an `Int32`, you will end up with two overloaded `send`
+  # methods. If you try to send to the method that takes the union, using a `String`, it will
+  # work as expected. However, if you try to send to the method that takes the union, using an
+  # Int32, the `send` that takes Int32 will be called, and it needs to be able to find the
+  # method that takes the union type.
+  #
+  # So....how to do this?
+  macro build_method_sends
+    {% use_procs = !@type.annotations(SendViaProc).empty? %}
+    {% for args in @type.methods.map { |method| method.args }.uniq %}
+    def send(method : String, {{ args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} )
+    pp method
+    pp %w( SEND {{ "SendLookup___#{args.map { |arg| arg.restriction.id.gsub(/ \| /, "_").id }.join("__").id}".id }}  ) 
+    {% classname = "SendLookup___#{args.map { |arg| arg.restriction.id.gsub(/ \| /, "_").id }.join("__").id}[method]".id %}
+    {% arglist = args.map { |arg| arg.name }.join(", ").id %}
+    {% if use_procs == true %}
+      {{ classname }}.call(self, {{ arglist }})
+    {% else %}
+      {{ classname }}.new(self, {{ arglist }}).call
+    {% end %}
+    end
     {% end %}
   end
 
-  macro build_method_sends
+  macro p_build_method_sends
+    <<-ECODE
+    {% use_procs = !@type.annotations(SendViaProc).empty? %}
     {% for args in @type.methods.map { |method| method.args }.uniq %}
     def send(method : String, {{ args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }})
-      SendLookup{{ args.map { |arg| arg.restriction.id.tr(" ","").tr("|","_").id }.join("").id }}[method].new(self, {{ args.map { |arg| arg.name }.join(", ").id }}).call
-    end
-    {% end %}
-  end
-
-  macro build_method_proc_sends
-    {% for args in @type.methods.map { |method| method.args }.uniq %}
-    def send(method : String, {{ args.map { |arg| "#{arg.name} : #{arg.restriction.id.tr(" ","").tr("|","_").id}" }.join(", ").id }})
-      SendLookup{{ args.map { |arg| arg.restriction.id.tr(" ","").tr("|","_").id }.join("").id }}[method].call(self, {{ args.map { |arg| arg.name }.join(", ").id }})
-    end
-    {% end %}
-  end
-
-  macro send_init(use_procs = false)
-    build_type_lookups
-    {% if use_procs %}
-      build_method_procs
-      build_method_proc_sends
+    {% classname = "SendLookup___#{args.map { |arg| arg.restriction.id.tr(" ", "").tr("|", "_").id }.join("").id}[method]".id %}
+    {% arglist = args.map { |arg| arg.name }.join(", ").id %}
+    {% if use_procs == true %}
+      {{ classname }}.call(self, {{ arglist }})
     {% else %}
-      build_method_records
-      build_method_sends
+      {{ classname }}.new(self, {{ arglist }}).call
     {% end %}
+    end
+    {% end %}
+    ECODE
   end
-
-  # macro build_type_lookups
-  #   {% for restriction in @type.methods.map do |method|
-  #                           method.args.map do |arg|
-  #                             arg.restriction
-  #                           end.join("")
-  #                         end.uniq %}
-  #     SendLookup{{ restriction.id }} = {
-  #       {% for method in @type.methods %}
-  #         {% if restriction == method.args.map { |arg| arg.restriction }.join("") %}
-  #           "{{ method.name }}": ->(
-  #             obj : {{ @type.id }},
-  #           {{ method.args.map do |arg|
-  #             "#{arg.name} : #{arg.restriction}"
-  #           end.join(", ").id }}
-  #         ) do
-  #           obj.{{ method.name }}({{ method.args.map { |arg| arg.name }.join(", ").id }})
-  #         end,
-  #         {% end %}
-  #       {% end %}
-  #     }
-  #   {% end %}
-  # end
-
-  # macro build_send_methods
-  #   {% for args in @type.methods.map { |method| method.args }.uniq %}
-  #   def send(
-  #     method : String,
-  #     {{ args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }})
-  #     SendLookup{{ args.map { |arg| arg.restriction }.join("").id }}[method].call(self, {{ args.map { |arg| arg.name }.join(", ").id }})
-  #   end
-  #   {% end %}
-  # end
 
   macro send_init
+    build_type_label_lookups
     build_type_lookups
-    build_send_methods
+    puts p_build_type_lookups
+    build_callsites
+    puts p_build_callsites
+    build_method_sends
+    puts p_build_method_sends
   end
 
   macro included
     send_init
   end
 end
-
-require "./send"
-require "big"
-
-class Foo
-  def a(val : Int32)
-    val + 7
-  end
-
-  def b(x : Int32, y : Int32)
-    x * y
-  end
-
-  def c(val : Int32, val2 : Int32)
-    val * val2
-  end
-
-  def d(xx : Int32, yy : Int32) : BigInt
-    BigInt.new(xx) ** yy
-  end
-
-  include Send
-  puts p_build_type_lookups
-end
-
-
-f = Foo.new
-puts
-puts f.b(7, 9)
-puts "------"
-10.times {puts f.send(rand < 0.5 ? "b" : "d", rand(20) + 1, rand(20) + 1)}
-
-
-puts f.send("a", 7)
-puts f.send("b", 7, 9)
-puts f.send("d", 2, 256)
-
-
-
-Benchmark.ips do |ips|
-  ips.report("direct") { f.b(rand(10000), rand(10000)) }
-  ips.report("send") { f.send("b", rand(10000), rand(10000)) }
-end
-
-
-  # SendLookupInt32 = {
-  #   "a": ->(obj : Foo, val : Int32) { obj.a(val) },
-  # }
-
-  # SendLookupInt32Int32 = {
-  #   "b": ->(obj : Foo, x : Int32, y : Int32) { obj.b(x, y) },
-  #   "c": ->(obj : Foo, val : Int32, val2 : Int32) { obj.c(val, val2) },
-  # }
-  #
-  # def send(method, arg1 : Int32)
-  #   SendLookupInt32[method].call(self, arg1)
-  # end
-
-  # def send(method, arg1 : Int32, arg2 : Int32)
-  #   SendLookupInt32Int32[method].call(self, arg1, arg2)
-  # end
