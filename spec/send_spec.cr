@@ -43,6 +43,10 @@ class OtherTestObj
     x * y
   end
 
+  def multimultiply(x : String | Int16 | Int32, y : String | Int16 | Int32)
+    x.to_i32 * y.to_i32
+  end
+
   def complex(x : String | Int32)
     x.to_s
   end
@@ -123,15 +127,15 @@ describe Send do
       othertest = OtherTestObj.new
 
       Benchmark.ips do |ips|
-        ips.report("direct method invocation") {test.nulltest}
-        ips.report("send via record callsites") {test.send("nulltest")}
-        ips.report("send via proc callsites") {othertest.send("nulltest")}
+        ips.report("direct method invocation") { test.nulltest }
+        ips.report("send via record callsites") { test.send("nulltest") }
+        ips.report("send via proc callsites") { othertest.send("nulltest") }
       end
 
       Benchmark.ips do |ips|
-        ips.report("direct method invocation") {test.multiply(rand(10000), rand(10000))}
-        ips.report("send via record callsites") {test.send("multiply", rand(10000), rand(10000))}
-        ips.report("send via proc callsites") {othertest.send("multiply", rand(10000), rand(10000))}
+        ips.report("direct method invocation") { test.multiply(rand(10000), rand(10000)) }
+        ips.report("send via record callsites") { test.send("multiply", rand(10000), rand(10000)) }
+        ips.report("send via proc callsites") { othertest.send("multiply", rand(10000), rand(10000)) }
       end
     end
   end

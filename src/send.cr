@@ -17,12 +17,62 @@ module Send
     }
   end
 
+  # macro build_type_lookups
+  #   {% for restriction in @type.methods.map { |method| MethodTypeLabel[method.args.symbolize] }.uniq %}
+  #     SendLookup___{{ restriction.id }} = {
+  #       {% for method in @type.methods %}{% if restriction == MethodTypeLabel[method.args.symbolize] %}"{{ method.name }}": Send_{{ method.name }}_{{ restriction.gsub(/::/,"_").id }},
+  #       {% end %}{% end %}
+  #     }
+  #   {% end %}
+  # end
+
   macro build_type_lookups
     {% for restriction in @type.methods.map { |method| MethodTypeLabel[method.args.symbolize] }.uniq %}
+      {%
+        base = restriction.split("__")
+        permutations = restriction.split("__").map do |elem|
+          elem.split("_").size
+        end.reduce(1) { |a, x| a *= x }
+        combos = [] of Array(String)
+        (1..permutations).each { combos << [] of String }
+        permutations_step = permutations
+        base.each do |b|
+          blen = b.split("_").size
+          progression = permutations_step / blen
+          repeats = permutations / (progression * blen)
+          step = 0
+          (1..repeats).each do |repeat|
+            b.split("_").each do |type|
+              (1..progression).each do |prog|
+                combos[step] << type
+                step += 1
+              end
+            end
+          end
+          permutations_step = progression
+        end
+      %}
+      puts "-----"
+      puts <<-ECODE
+      {{ restriction }}
+      {{ base.size }}
+      {{ base }}
+      {{ combos }}
+      ECODE
+
       SendLookup___{{ restriction.id }} = {
-        {% for method in @type.methods %}{% if restriction == MethodTypeLabel[method.args.symbolize] %}"{{ method.name }}": Send_{{ method.name }}_{{ restriction.gsub(/::/,"_").id }},
+        {% for method in @type.methods %}{% if restriction == MethodTypeLabel[method.args.symbolize] %}"{{ method.name }}": Send_{{ method.name }}_{{ restriction.gsub(/::/, "_").id }},
         {% end %}{% end %}
       }
+      {% for combo in combos %}
+      {% combo_string = combo.join("__").id %}
+      {% if restriction.id != combo_string %}
+      SendLookup___{{ combo.join("__").id }} = {
+        {% for method in @type.methods %}{% if restriction == MethodTypeLabel[method.args.symbolize] %}"{{ method.name }}": Send_{{ method.name }}_{{ restriction.gsub(/::/, "_").id }},
+        {% end %}{% end %}
+      }
+      {% end %}
+      {% end %}
     {% end %}
   end
 
@@ -62,11 +112,11 @@ module Send
       {% method_args = method.args %}
       {% method_name = method.name %}
       {% if use_procs == true %}
-        Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/,"_").id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
+        Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "_").id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
           obj.{{ method_name }}({{ method_args.map { |method| method.name }.join(", ").id }})
         end
       {% else %}
-        record Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/,"_").id }}, obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
+        record Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "_").id }}, obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
           def call
             obj.{{ method_name }}({{ method_args.map { |method| method.name }.join(", ").id }})
           end
@@ -145,11 +195,8 @@ module Send
   macro send_init
     build_type_label_lookups
     build_type_lookups
-    puts p_build_type_lookups
     build_callsites
-    puts p_build_callsites
     build_method_sends
-    puts p_build_method_sends
   end
 
   macro included
