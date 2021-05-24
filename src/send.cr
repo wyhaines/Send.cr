@@ -27,6 +27,7 @@ module Send
   # end
 
   macro build_type_lookups
+    SendRawCombos = Hash(String, Hash(String, Array(String))).new {|h,k| h[k] = Hash(String, Array(String)).new}
     {% for restriction in @type.methods.map { |method| MethodTypeLabel[method.args.symbolize] }.uniq %}
       {%
         base = restriction.split("__")
@@ -52,38 +53,58 @@ module Send
           permutations_step = progression
         end
       %}
-      puts "-----"
-      puts <<-ECODE
-      {{ restriction }}
-      {{ base.size }}
-      {{ base }}
-      {{ combos }}
-      ECODE
 
-      SendLookup___{{ restriction.id }} = {
-        {% for method in @type.methods %}{% if restriction == MethodTypeLabel[method.args.symbolize] %}"{{ method.name }}": Send_{{ method.name }}_{{ restriction.gsub(/::/, "_").id }},
-        {% end %}{% end %}
-      }
+      # SendLookup___{{ restriction.id }} = {
+      #   {% for method in @type.methods %}{% if restriction == MethodTypeLabel[method.args.symbolize] %}"{{ method.name }}": Send_{{ method.name }}_{{ restriction.gsub(/::/, "_").id }},
+      #   {% end %}{% end %}
+      # }
       {% for combo in combos %}
       {% combo_string = combo.join("__").id %}
-      {% if restriction.id != combo_string %}
-      SendLookup___{{ combo.join("__").id }} = {
-        {% for method in @type.methods %}{% if restriction == MethodTypeLabel[method.args.symbolize] %}"{{ method.name }}": Send_{{ method.name }}_{{ restriction.gsub(/::/, "_").id }},
-        {% end %}{% end %}
-      }
-      {% end %}
-      {% end %}
-    {% end %}
+      {% constant_name = "SendLookup___#{combo.join("__").id}" %}
+      {% for method in @type.methods %}
+      {% if restriction == MethodTypeLabel[method.args.symbolize] %}SendRawCombos[{{constant_name}}][{{method.name.stringify}}] << "Send_{{ method.name }}_{{ restriction.gsub(/::/, "_").id }}"
+      {% end %}{% end %}{% end %}{% end %}
   end
 
   macro p_build_type_lookups
     <<-ECODE
+    SendRawCombos = Hash(String, Hash(String, Array(String))).new {|h,k| h[k] = Hash(String, Array(String)).new}
     {% for restriction in @type.methods.map { |method| MethodTypeLabel[method.args.symbolize] }.uniq %}
-      SendLookup___{{ restriction.id }} = {
-        {% for method in @type.methods %}{% if restriction == MethodTypeLabel[method.args.symbolize] %}"{{ method.name }}": Send_{{ method.name }}{{ restriction.id }},
-        {% end %}{% end %}
-      }
-    {% end %}
+      {%
+        base = restriction.split("__")
+        permutations = restriction.split("__").map do |elem|
+          elem.split("_").size
+        end.reduce(1) { |a, x| a *= x }
+        combos = [] of Array(String)
+        (1..permutations).each { combos << [] of String }
+        permutations_step = permutations
+        base.each do |b|
+          blen = b.split("_").size
+          progression = permutations_step / blen
+          repeats = permutations / (progression * blen)
+          step = 0
+          (1..repeats).each do |repeat|
+            b.split("_").each do |type|
+              (1..progression).each do |prog|
+                combos[step] << type
+                step += 1
+              end
+            end
+          end
+          permutations_step = progression
+        end
+      %}
+
+      # SendLookup___{{ restriction.id }} = {
+      #   {% for method in @type.methods %}{% if restriction == MethodTypeLabel[method.args.symbolize] %}"{{ method.name }}": Send_{{ method.name }}_{{ restriction.gsub(/::/, "_").id }},
+      #   {% end %}{% end %}
+      # }
+      {% for combo in combos %}
+      {% combo_string = combo.join("__").id %}
+      {% constant_name = "SendLookup___#{combo.join("__").id}" %}
+      {% for method in @type.methods %}
+      {% if restriction == MethodTypeLabel[method.args.symbolize] %}SendRawCombos[{{constant_name}}][{{method.name.stringify}}] << "Send_{{ method.name }}_{{ restriction.gsub(/::/, "_").id }}"
+      {% end %}{% end %}{% end %}{% end %}
     ECODE
   end
 
@@ -132,11 +153,11 @@ module Send
       {% method_args = method.args %}
       {% method_name = method.name %}
       {% if use_procs == true %}
-        Send_{{ method_name }}{{ MethodTypeLabel[method.args.symbolize].id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
+        Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "_").id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
           obj.{{ method_name }}({{ method_args.map { |method| method.name }.join(", ").id }})
         end
       {% else %}
-        record Send_{{ method_name }}{{ MethodTypeLabel[method.args.symbolize].id }}, obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
+        record Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "_").id }}, obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
           def call
             obj.{{ method_name }}({{ method_args.map { |method| method.name }.join(", ").id }})
           end
@@ -162,15 +183,13 @@ module Send
     {% use_procs = !@type.annotations(SendViaProc).empty? %}
     {% for args in @type.methods.map { |method| method.args }.uniq %}
     def send(method : String, {{ args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} )
-    pp method
-    pp %w( SEND {{ "SendLookup___#{args.map { |arg| arg.restriction.id.gsub(/ \| /, "_").id }.join("__").id}".id }}  ) 
     {% classname = "SendLookup___#{args.map { |arg| arg.restriction.id.gsub(/ \| /, "_").id }.join("__").id}[method]".id %}
     {% arglist = args.map { |arg| arg.name }.join(", ").id %}
-    {% if use_procs == true %}
-      {{ classname }}.call(self, {{ arglist }})
-    {% else %}
-      {{ classname }}.new(self, {{ arglist }}).call
-    {% end %}
+    # {% if use_procs == true %}
+    #   {{ classname }}.call(self, {{ arglist }})
+    # {% else %}
+    #   {{ classname }}.new(self, {{ arglist }}).call
+    # {% end %}
     end
     {% end %}
   end
@@ -179,14 +198,14 @@ module Send
     <<-ECODE
     {% use_procs = !@type.annotations(SendViaProc).empty? %}
     {% for args in @type.methods.map { |method| method.args }.uniq %}
-    def send(method : String, {{ args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }})
-    {% classname = "SendLookup___#{args.map { |arg| arg.restriction.id.tr(" ", "").tr("|", "_").id }.join("").id}[method]".id %}
+    def send(method : String, {{ args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} )
+    {% classname = "SendLookup___#{args.map { |arg| arg.restriction.id.gsub(/ \| /, "_").id }.join("__").id}[method]".id %}
     {% arglist = args.map { |arg| arg.name }.join(", ").id %}
-    {% if use_procs == true %}
-      {{ classname }}.call(self, {{ arglist }})
-    {% else %}
-      {{ classname }}.new(self, {{ arglist }}).call
-    {% end %}
+    # {% if use_procs == true %}
+    #   {{ classname }}.call(self, {{ arglist }})
+    # {% else %}
+    #   {{ classname }}.new(self, {{ arglist }}).call
+    # {% end %}
     end
     {% end %}
     ECODE
@@ -194,9 +213,11 @@ module Send
 
   macro send_init
     build_type_label_lookups
-    build_type_lookups
-    build_callsites
-    build_method_sends
+    puts p_build_type_lookups
+    # pp "----------"
+    # pp SendRawCombos
+    puts p_build_callsites
+    puts p_build_method_sends
   end
 
   macro included
