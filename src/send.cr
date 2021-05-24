@@ -27,7 +27,9 @@ module Send
   # end
 
   macro build_type_lookups
-    SendRawCombos = Hash(String, Hash(String, Array(String))).new {|h,k| h[k] = Hash(String, Array(String)).new}
+    SendRawCombos = Hash(String, Hash(String, Array(String))).new do |h,k|
+      h[k] = Hash(String, Array(String)).new {|h2,k2| h2[k2] = Array(String).new}
+    end
     {% for restriction in @type.methods.map { |method| MethodTypeLabel[method.args.symbolize] }.uniq %}
       {%
         base = restriction.split("__")
@@ -213,9 +215,9 @@ module Send
 
   macro send_init
     build_type_label_lookups
-    puts p_build_type_lookups
-    # pp "----------"
-    # pp SendRawCombos
+    build_type_lookups
+    pp "----------"
+    pp SendRawCombos
     puts p_build_callsites
     puts p_build_method_sends
   end
