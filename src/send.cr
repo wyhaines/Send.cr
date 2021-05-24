@@ -9,15 +9,15 @@ end
 module Send
   VERSION = "0.1.0"
 
+  # Yeah, I realize that there is a line here that is horrible. Forgive me.
   macro build_type_label_lookups
     MethodTypeLabel = {
     {% for method in @type.methods %}
-      {{method.args.symbolize}} => {{ method.args.map { |arg| arg.restriction.id.gsub(/ \| /, "_").id }.join("__") }},
+      {{method.args.symbolize}} => {{ method.args.map { |arg| arg.restriction.resolve.union? ? arg.restriction.resolve.union_types.map{|ut| ut.id.gsub(/[)(]/,"").gsub(/ \| /,"_")}.join("_") : arg.restriction.id.gsub(/ \| /, "_").id }.join("__") }},
     {% end %}
     }
   end
 
-  
   macro build_type_lookups
     {%
       src = {} of String => Hash(String, String)
@@ -48,16 +48,18 @@ module Send
 
         combos.each do |combo|
           combo_string = combo.join("__").id
-          constant_name = "SendLookup___#{combo.join("__").id}"
+          constant_name = "SendLookup___#{combo.map{|c| c.gsub(/::/,"CXOLOXN")}.join("__").id}"
           @type.methods.each do |method|
             if restriction == MethodTypeLabel[method.args.symbolize]
+              idx = -1
+              combo_arg_sig = method.args.map {|arg| idx += 1; "#{arg.name} : #{combo[idx].id}"}.join(", ")
               if !src.keys.includes?(constant_name)
                 sends[constant_name] = {} of String => String
                 src[constant_name] = {} of String => String
               end
               signature = method.args.map {|arg| "#{arg.name} : #{arg.restriction}"}.join(", ")
-              sends[constant_name][signature] = method.args.map {|arg| arg.name}.join(", ")
-              src[constant_name][method.name.stringify] = "Send_#{method.name}_#{restriction.id}"
+              sends[constant_name][combo_arg_sig] = method.args.map {|arg| arg.name}.join(", ")
+              src[constant_name][method.name.stringify] = "Send_#{method.name}_#{restriction.gsub(/::/,"CXOLOXN").id}"
             end
           end
         end
@@ -101,11 +103,11 @@ module Send
       {% method_args = method.args %}
       {% method_name = method.name %}
       {% if use_procs == true %}
-        Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "_").id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
+        Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
           obj.{{ method_name }}({{ method_args.map { |method| method.name }.join(", ").id }})
         end
       {% else %}
-        record Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "_").id }}, obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
+        record Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }}, obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
           def call
             obj.{{ method_name }}({{ method_args.map { |method| method.name }.join(", ").id }})
           end

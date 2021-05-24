@@ -35,8 +35,9 @@ class OtherTestObj
     true
   end
 
-  def num_or_string_to_bigint(val : String | Int32)
-    BigInt.new(val.to_s)
+  alias Num = Int::Signed | Int::Unsigned | Float::Primitive
+  def num_or_string_to_bigint(val : String | Num)
+    BigInt.new(val.is_a?(Float) ? val.to_i128 : val.to_s)
   end
 
   def multiply(x : Int32, y : Int32)
@@ -53,28 +54,6 @@ class OtherTestObj
 
   include Send
 end
-
-# Benchmark.ips do |ips|
-#   ips.report("direct") { f.b(rand(10000), rand(10000)) }
-#   ips.report("send") { f.send("b", rand(10000), rand(10000)) }
-# end
-
-# SendLookupInt32 = {
-#   "a": ->(obj : Foo, val : Int32) { obj.a(val) },
-# }
-
-# SendLookupInt32Int32 = {
-#   "b": ->(obj : Foo, x : Int32, y : Int32) { obj.b(x, y) },
-#   "c": ->(obj : Foo, val : Int32, val2 : Int32) { obj.c(val, val2) },
-# }
-#
-# def send(method, arg1 : Int32)
-#   SendLookupInt32[method].call(self, arg1)
-# end
-
-# def send(method, arg1 : Int32, arg2 : Int32)
-#   SendLookupInt32Int32[method].call(self, arg1, arg2)
-# end
 
 describe Send do
   it "can send messages to methods with simple type signatures" do
@@ -110,10 +89,11 @@ describe Send do
     othertest.send("complex", "7").should eq "7"
   end
 
-  it "using the Proc method allows dispatch to methods that have types which don't work as instance variables" do
+  it "can handle nested, substantial type union combinations" do
     othertest = OtherTestObj.new
 
     othertest.send("num_or_string_to_bigint", 7).should eq BigInt.new(7)
+    othertest.send("num_or_string_to_bigint", 9.83).should eq BigInt.new(9)
     othertest.send("num_or_string_to_bigint", "115792089237316195423570985008687907853269984665640564039457584007913129639936").should eq BigInt.new("115792089237316195423570985008687907853269984665640564039457584007913129639936")
   end
 
