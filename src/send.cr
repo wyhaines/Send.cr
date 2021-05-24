@@ -17,21 +17,12 @@ module Send
     }
   end
 
-  # macro build_type_lookups
-  #   {% for restriction in @type.methods.map { |method| MethodTypeLabel[method.args.symbolize] }.uniq %}
-  #     SendLookup___{{ restriction.id }} = {
-  #       {% for method in @type.methods %}{% if restriction == MethodTypeLabel[method.args.symbolize] %}"{{ method.name }}": Send_{{ method.name }}_{{ restriction.gsub(/::/,"_").id }},
-  #       {% end %}{% end %}
-  #     }
-  #   {% end %}
-  # end
-
+  
   macro build_type_lookups
-    SendRawCombos = Hash(String, Hash(String, Array(String))).new do |h,k|
-      h[k] = Hash(String, Array(String)).new {|h2,k2| h2[k2] = Array(String).new}
-    end
-    {% for restriction in @type.methods.map { |method| MethodTypeLabel[method.args.symbolize] }.uniq %}
-      {%
+    {%
+      src = {} of String => Hash(String, String)
+      sends = {} of String => Hash(String, String)
+      @type.methods.map { |method| MethodTypeLabel[method.args.symbolize] }.uniq.each do |restriction|
         base = restriction.split("__")
         permutations = restriction.split("__").map do |elem|
           elem.split("_").size
@@ -54,60 +45,35 @@ module Send
           end
           permutations_step = progression
         end
-      %}
 
-      # SendLookup___{{ restriction.id }} = {
-      #   {% for method in @type.methods %}{% if restriction == MethodTypeLabel[method.args.symbolize] %}"{{ method.name }}": Send_{{ method.name }}_{{ restriction.gsub(/::/, "_").id }},
-      #   {% end %}{% end %}
-      # }
-      {% for combo in combos %}
-      {% combo_string = combo.join("__").id %}
-      {% constant_name = "SendLookup___#{combo.join("__").id}" %}
-      {% for method in @type.methods %}
-      {% if restriction == MethodTypeLabel[method.args.symbolize] %}SendRawCombos[{{constant_name}}][{{method.name.stringify}}] << "Send_{{ method.name }}_{{ restriction.gsub(/::/, "_").id }}"
-      {% end %}{% end %}{% end %}{% end %}
+        combos.each do |combo|
+          combo_string = combo.join("__").id
+          constant_name = "SendLookup___#{combo.join("__").id}"
+          @type.methods.each do |method|
+            if restriction == MethodTypeLabel[method.args.symbolize]
+              if !src.keys.includes?(constant_name)
+                sends[constant_name] = {} of String => String
+                src[constant_name] = {} of String => String
+              end
+              signature = method.args.map {|arg| "#{arg.name} : #{arg.restriction}"}.join(", ")
+              sends[constant_name][signature] = method.args.map {|arg| arg.name}.join(", ")
+              src[constant_name][method.name.stringify] = "Send_#{method.name}_#{restriction.id}"
+            end
+          end
+        end
+      end
+    %}
+    SendRawCombos = {{src.stringify.id}}
+    SendParameters = {{sends.stringify.id}}
   end
 
-  macro p_build_type_lookups
-    <<-ECODE
-    SendRawCombos = Hash(String, Hash(String, Array(String))).new {|h,k| h[k] = Hash(String, Array(String)).new}
-    {% for restriction in @type.methods.map { |method| MethodTypeLabel[method.args.symbolize] }.uniq %}
-      {%
-        base = restriction.split("__")
-        permutations = restriction.split("__").map do |elem|
-          elem.split("_").size
-        end.reduce(1) { |a, x| a *= x }
-        combos = [] of Array(String)
-        (1..permutations).each { combos << [] of String }
-        permutations_step = permutations
-        base.each do |b|
-          blen = b.split("_").size
-          progression = permutations_step / blen
-          repeats = permutations / (progression * blen)
-          step = 0
-          (1..repeats).each do |repeat|
-            b.split("_").each do |type|
-              (1..progression).each do |prog|
-                combos[step] << type
-                step += 1
-              end
-            end
-          end
-          permutations_step = progression
-        end
-      %}
-
-      # SendLookup___{{ restriction.id }} = {
-      #   {% for method in @type.methods %}{% if restriction == MethodTypeLabel[method.args.symbolize] %}"{{ method.name }}": Send_{{ method.name }}_{{ restriction.gsub(/::/, "_").id }},
-      #   {% end %}{% end %}
-      # }
-      {% for combo in combos %}
-      {% combo_string = combo.join("__").id %}
-      {% constant_name = "SendLookup___#{combo.join("__").id}" %}
-      {% for method in @type.methods %}
-      {% if restriction == MethodTypeLabel[method.args.symbolize] %}SendRawCombos[{{constant_name}}][{{method.name.stringify}}] << "Send_{{ method.name }}_{{ restriction.gsub(/::/, "_").id }}"
-      {% end %}{% end %}{% end %}{% end %}
-    ECODE
+  macro build_lookup_constants
+    {% combo_keys = SendRawCombos.keys %}
+    {% for constant_name in combo_keys %}
+    {% hsh = SendRawCombos[constant_name] %}
+    {{ constant_name.id }} = {
+      {% for method_name, callsite in hsh %}{{method_name}}: {{callsite.id}},
+      {% end %}}{% end %}
   end
 
   # There are two approaches to providing callsites for invoking methods
@@ -148,27 +114,6 @@ module Send
     {% end %}
   end
 
-  macro p_build_callsites
-    <<-ECODE
-    {% use_procs = !@type.annotations(SendViaProc).empty? %}
-    {% for method in @type.methods %}
-      {% method_args = method.args %}
-      {% method_name = method.name %}
-      {% if use_procs == true %}
-        Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "_").id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
-          obj.{{ method_name }}({{ method_args.map { |method| method.name }.join(", ").id }})
-        end
-      {% else %}
-        record Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "_").id }}, obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
-          def call
-            obj.{{ method_name }}({{ method_args.map { |method| method.name }.join(", ").id }})
-          end
-        end
-      {% end %}
-    {% end %}
-    ECODE
-  end
-
   # Send needs to find the right method to call, in a world where type unions exist and are
   # common. This may not be the right approach, but it is an approach, and it what I am starting
   # with.
@@ -183,43 +128,25 @@ module Send
   # So....how to do this?
   macro build_method_sends
     {% use_procs = !@type.annotations(SendViaProc).empty? %}
-    {% for args in @type.methods.map { |method| method.args }.uniq %}
-    def send(method : String, {{ args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} )
-    {% classname = "SendLookup___#{args.map { |arg| arg.restriction.id.gsub(/ \| /, "_").id }.join("__").id}[method]".id %}
-    {% arglist = args.map { |arg| arg.name }.join(", ").id %}
-    # {% if use_procs == true %}
-    #   {{ classname }}.call(self, {{ arglist }})
-    # {% else %}
-    #   {{ classname }}.new(self, {{ arglist }}).call
-    # {% end %}
+    {% for constant, hsh in SendParameters %}
+    {% for signature, args in hsh %}
+    def send(method : String, {{ signature.id }})
+      {% if use_procs == true %}
+        {{ constant.id }}[method].call(self, {{ args.id }})
+      {% else %}
+        {{ constant.id }}[method].new(self, {{ args.id }}).call
+      {% end %}
     end
     {% end %}
-  end
-
-  macro p_build_method_sends
-    <<-ECODE
-    {% use_procs = !@type.annotations(SendViaProc).empty? %}
-    {% for args in @type.methods.map { |method| method.args }.uniq %}
-    def send(method : String, {{ args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} )
-    {% classname = "SendLookup___#{args.map { |arg| arg.restriction.id.gsub(/ \| /, "_").id }.join("__").id}[method]".id %}
-    {% arglist = args.map { |arg| arg.name }.join(", ").id %}
-    # {% if use_procs == true %}
-    #   {{ classname }}.call(self, {{ arglist }})
-    # {% else %}
-    #   {{ classname }}.new(self, {{ arglist }}).call
-    # {% end %}
-    end
     {% end %}
-    ECODE
   end
 
   macro send_init
     build_type_label_lookups
     build_type_lookups
-    pp "----------"
-    pp SendRawCombos
-    puts p_build_callsites
-    puts p_build_method_sends
+    build_lookup_constants
+    build_callsites
+    build_method_sends
   end
 
   macro included
