@@ -9,11 +9,13 @@ end
 module Send
   VERSION = "0.1.0"
 
+  class MethodMissing < Exception; end
+
   # Yeah, I realize that there is a line here that is horrible. Forgive me.
   macro build_type_label_lookups
     MethodTypeLabel = {
     {% for method in @type.methods %}
-      {{method.args.symbolize}} => {{ method.args.map { |arg| arg.restriction.resolve.union? ? arg.restriction.resolve.union_types.map{|ut| ut.id.gsub(/[)(]/,"").gsub(/ \| /,"_")}.join("_") : arg.restriction.id.gsub(/ \| /, "_").id }.join("__") }},
+      {{method.args.symbolize}} => {{ method.args.reject {|arg| arg.restriction.is_a?(Nop)}.map { |arg| arg.restriction.resolve.union? ? arg.restriction.resolve.union_types.map{|ut| ut.id.gsub(/[)(]/,"").gsub(/ \| /,"_")}.join("_") : arg.restriction.id.gsub(/ \| /, "_").id }.join("__") }},
     {% end %}
     }
   end
@@ -22,7 +24,7 @@ module Send
     {%
       src = {} of String => Hash(String, String)
       sends = {} of String => Hash(String, String)
-      @type.methods.map { |method| MethodTypeLabel[method.args.symbolize] }.uniq.each do |restriction|
+      @type.methods.reject {|method| method.args.any? {|arg| arg.restriction.is_a?(Nop)}}.map { |method| MethodTypeLabel[method.args.symbolize] }.uniq.each do |restriction|
         base = restriction.split("__")
         permutations = restriction.split("__").map do |elem|
           elem.split("_").size
@@ -49,7 +51,7 @@ module Send
         combos.each do |combo|
           combo_string = combo.join("__").id
           constant_name = "SendLookup___#{combo.map{|c| c.gsub(/::/,"CXOLOXN")}.join("__").id}"
-          @type.methods.each do |method|
+          @type.methods.reject {|method| method.args.any? {|arg| arg.restriction.is_a?(Nop)}}.each do |method|
             if restriction == MethodTypeLabel[method.args.symbolize]
               idx = -1
               combo_arg_sig = method.args.map {|arg| idx += 1; "#{arg.name} : #{combo[idx].id}"}.join(", ")
@@ -99,7 +101,7 @@ module Send
   # callsites.
   macro build_callsites
     {% use_procs = !@type.annotations(SendViaProc).empty? %}
-    {% for method in @type.methods %}
+    {% for method in @type.methods.reject {|method| method.args.any? {|arg| arg.restriction.is_a?(Nop)}} %}
       {% method_args = method.args %}
       {% method_name = method.name %}
       {% if use_procs == true %}
@@ -132,13 +134,36 @@ module Send
     {% use_procs = !@type.annotations(SendViaProc).empty? %}
     {% for constant, hsh in SendParameters %}
     {% for signature, args in hsh %}
-    def send(method : String, {{ signature.id }})
+    def __send__(method : String, {{ signature.id }})
+      begin
       {% if use_procs == true %}
         {{ constant.id }}[method].call(self, {{ args.id }})
       {% else %}
         {{ constant.id }}[method].new(self, {{ args.id }}).call
       {% end %}
+      rescue KeyError
+        raise MethodMissing.new("Can not send to '#{method}'; check that it exists and all arguments have type specifications.")
+      end
     end
+    def send(method : String, {{ signature.id }})
+      __send__(method, {{ args.id }})
+    end
+
+    def __send__?(method : String, {{ signature.id }})
+    begin
+      {% if use_procs == true %}
+        {{ constant.id }}[method].call(self, {{ args.id }})
+      {% else %}
+        {{ constant.id }}[method].new(self, {{ args.id }}).call
+      {% end %}
+      rescue KeyError
+        return nil
+      end
+    end
+    def send?(method : String, {{ signature.id }})
+      __send__?(method, {{ args.id }})
+    end
+
     {% end %}
     {% end %}
   end

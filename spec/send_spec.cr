@@ -26,6 +26,10 @@ class TestObj
     x.to_s
   end
 
+  def broken(foo)
+    foo
+  end
+
   include Send
 end
 
@@ -65,6 +69,33 @@ describe Send do
     (test.send("multiply", 7, 9) + 1).should eq test.send("multiply_plus", 7, 9)
 
     test.send("exponent", 2, 256).should eq BigInt.new("115792089237316195423570985008687907853269984665640564039457584007913129639936")
+  end
+
+  it "raises an exception if the method can't be sent to" do
+    test = TestObj.new
+    test.broken(7).should eq 7
+
+    e = nil
+    begin
+      test.send("broken", 7)
+    rescue e : Send::MethodMissing
+    end
+
+    e.should_not be_nil
+    e.class.should eq Send::MethodMissing
+  end
+
+  it "will swallow a MethodMissing exception if the ? method is called" do
+    test = TestObj.new
+    e = nil
+    f = nil
+    begin
+      f = test.send?("broken", 7)
+    rescue e : Send::MethodMissing
+    end
+
+    e.should be_nil
+    f.should be_nil
   end
 
   it "can dispatch when the method name is in a variable" do
