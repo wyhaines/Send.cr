@@ -1,5 +1,9 @@
 # send
 
+![CSUUID CI](https://img.shields.io/github/workflow/status/wyhaines/Send.cr/Send.cr%20CI?style=for-the-badge&logo=GitHub)
+[![GitHub release](https://img.shields.io/github/release/wyhaines/Send.cr.svg?style=for-the-badge)](https://github.com/wyhaines/Send.cr/releases)
+![GitHub commits since latest release (by SemVer)](https://img.shields.io/github/commits-since/wyhaines/Send.cr/latest?style=for-the-badge)
+
 Crystal looks and feels a lot like Ruby. However, pieces of the metaprogramming toolkits between the two languages are very different. The high level difference is that Ruby makes extensive use of facilities like `eval`, `method_missing`, and `send` to do its dynamic magic. And while Crystal does support `method_missing`, because of its compiled nature, most of Crystal's dynamic magic comes from the use of macros. Crystal does not support `eval` or  `send`.
 
 However...
@@ -148,10 +152,20 @@ The `@[SendViaRecord]` annotation is also supported, but since that is the defau
 These same annotations can also be used on methods to specify the `send` behavior for a given method.
 
 ```
+@[SendViaProc]
 class Foo
+  def abc(n : Int32)
+    n ** n
+  end
 
+  @[SendViaRecord]
+  def onetwothree(x : Int::Signed | Int::Unsigned, y : Int::Signed | Int::Unsigned)
+    BigInt.new(x) ** BigInt.new(y)
+  end
 end
 ```
+
+The 
 
 ## Development
 
@@ -159,7 +173,7 @@ TODO: Write development instructions here
 
 ## Contributing
 
-1. Fork it (<https://github.com/your-github-user/send/fork>)
+1. Fork it (<https://github.com/wyhaines/send/fork>)
 2. Create your feature branch (`git checkout -b my-new-feature`)
 3. Commit your changes (`git commit -am 'Add some feature'`)
 4. Push to the branch (`git push origin my-new-feature`)
@@ -167,4 +181,7 @@ TODO: Write development instructions here
 
 ## Contributors
 
-- [Kirk Haines](https://github.com/your-github-user) - creator and maintainer
+- [Kirk Haines](https://github.com/wyhaines) - creator and maintainer
+
+![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/wyhaines/Send.cr?style=for-the-badge)
+![GitHub issues](https://img.shields.io/github/issues/wyhaines/Send.cr?style=for-the-badge)
