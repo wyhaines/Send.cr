@@ -15,7 +15,15 @@ module Send
   macro build_type_label_lookups
     MethodTypeLabel = {
     {% for method in @type.methods %}
-      {{method.args.symbolize}} => {{ method.args.reject { |arg| arg.restriction.is_a?(Nop) }.map { |arg| arg.restriction.resolve.union? ? arg.restriction.resolve.union_types.map { |ut| ut.id.gsub(/[)(]/, "").gsub(/ \| /, "_") }.join("_") : arg.restriction.id.gsub(/ \| /, "_").id }.join("__") }},
+      {{method.args.symbolize}} => {{
+                                     method.args.reject do |arg|
+                                       arg.restriction.is_a?(Nop)
+                                     end.map do |arg|
+                                       arg.restriction.resolve.union? ? arg.restriction.resolve.union_types.map do |ut|
+                                         ut.id.gsub(/[)(]/, "").gsub(/ \| /, "_")
+                                       end.join("_") : arg.restriction.id.gsub(/ \| /, "_").id
+                                     end.join("__")
+                                   }},
     {% end %}
     }
   end
@@ -50,7 +58,7 @@ module Send
 
         combos.each do |combo|
           combo_string = combo.join("__").id
-          constant_name = "SendLookup___#{combo.map { |c| c.gsub(/::/, "CXOLOXN") }.join("__").id}"
+          constant_name = "SendLookup___#{combo.map { |c| c.gsub(/::/, "CXOLOXN") }.join("__").id}" # ameba:disable Style/VerboseBlock
           @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.each do |method|
             if restriction == MethodTypeLabel[method.args.symbolize]
               if !method.annotations(SendViaProc).empty?
@@ -155,7 +163,7 @@ module Send
         use_procs = class_use_procs
       end
     %}
-    
+
     def __send__(method : String, {{ signature.id }})
       begin
       {% if use_procs == true %}
