@@ -166,12 +166,12 @@ puts f.send(<span class="s">&quot;d&quot;</span>, <span class="s">&quot;2&quot;<
 <p>And while it might seem like this would slow down that method dispatch, the benchmarks prove otherwise. </p>
 
 <pre><code class="language-crystal">Benchmarks...
- direct method invocation -- nulltest 769.43M (  1.30ns) (Â± 1.76%)  0.0B/op        fastest
-send via record callsites -- nulltest 767.27M (  1.30ns) (Â± 4.33%)  0.0B/op   1.00x slower
-  send via proc callsites -- nulltest 511.92M (  1.95ns) (Â± 2.33%)  0.0B/op   1.50x slower
- direct method invocation 384.59M (  2.60ns) (Â± 1.91%)  0.0B/op        fastest
-send via record callsites 383.23M (  2.61ns) (Â± 3.04%)  0.0B/op   1.00x slower
-  send via proc callsites 230.41M (  4.34ns) (Â± 2.39%)  0.0B/op   1.67x slower
+ direct method invocation -- nulltest 927.30M (  1.08ns) (± 1.20%)  0.0B/op        fastest
+send via record callsites -- nulltest 926.22M (  1.08ns) (± 1.85%)  0.0B/op   1.00x slower
+  send via proc callsites -- nulltest 367.63M (  2.72ns) (± 1.25%)  0.0B/op   2.52x slower
+ direct method invocation 386.46M (  2.59ns) (± 1.17%)  0.0B/op        fastest
+send via record callsites 384.89M (  2.60ns) (± 3.20%)  0.0B/op   1.00x slower
+  send via proc callsites 220.40M (  4.54ns) (± 1.57%)  0.0B/op   1.75x slowerr
 </code></pre>
 
 <p>For all intents and purposes, when running code build with <code>--release</code>, the execution speed between the direct calls and the <code>#send</code> based calls is the same, when using <em>record</em> type callsites. It is somewhat slower when using <em>proc</em> type callsites, but the performance is still reasonably good.</p>
