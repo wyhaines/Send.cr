@@ -187,7 +187,7 @@ The
 
 ## Development
 
-TODO: Write development instructions here
+I am putting this here mostly as a note to myself, but the current approach is to iterate on the defined methods at the end of the class definition. It might be better if the code were included at the start of the class definition, since that is a pretty standard practice, and then to replace the iteration with a `method_added` hook that does all of the analysis and code generation for each method, one at a time.
 
 ## Contributing
 
