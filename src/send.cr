@@ -15,7 +15,7 @@ module Send
   macro build_type_label_lookups
     MethodTypeLabel = {
     {% for method in @type.methods %}
-      {{method.args.symbolize}} => {{ method.args.reject {|arg| arg.restriction.is_a?(Nop)}.map { |arg| arg.restriction.resolve.union? ? arg.restriction.resolve.union_types.map{|ut| ut.id.gsub(/[)(]/,"").gsub(/ \| /,"_")}.join("_") : arg.restriction.id.gsub(/ \| /, "_").id }.join("__") }},
+      {{method.args.symbolize}} => {{ method.args.reject { |arg| arg.restriction.is_a?(Nop) }.map { |arg| arg.restriction.resolve.union? ? arg.restriction.resolve.union_types.map { |ut| ut.id.gsub(/[)(]/, "").gsub(/ \| /, "_") }.join("_") : arg.restriction.id.gsub(/ \| /, "_").id }.join("__") }},
     {% end %}
     }
   end
@@ -23,8 +23,8 @@ module Send
   macro build_type_lookups
     {%
       src = {} of String => Hash(String, String)
-      sends = {} of String => Hash(String, String)
-      @type.methods.reject {|method| method.args.any? {|arg| arg.restriction.is_a?(Nop)}}.map { |method| MethodTypeLabel[method.args.symbolize] }.uniq.each do |restriction|
+      sends = {} of String => Hash(String, Hash(String, String))
+      @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.map { |method| MethodTypeLabel[method.args.symbolize] }.uniq.each do |restriction|
         base = restriction.split("__")
         permutations = restriction.split("__").map do |elem|
           elem.split("_").size
@@ -50,18 +50,28 @@ module Send
 
         combos.each do |combo|
           combo_string = combo.join("__").id
-          constant_name = "SendLookup___#{combo.map{|c| c.gsub(/::/,"CXOLOXN")}.join("__").id}"
-          @type.methods.reject {|method| method.args.any? {|arg| arg.restriction.is_a?(Nop)}}.each do |method|
+          constant_name = "SendLookup___#{combo.map { |c| c.gsub(/::/, "CXOLOXN") }.join("__").id}"
+          @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.each do |method|
             if restriction == MethodTypeLabel[method.args.symbolize]
+              if !method.annotations(SendViaProc).empty?
+                use_procs = "Y:"
+              elsif !method.annotations(SendViaRecord).empty?
+                use_procs = "N:"
+              else
+                use_procs = ":"
+              end
               idx = -1
-              combo_arg_sig = method.args.map {|arg| idx += 1; "#{arg.name} : #{combo[idx].id}"}.join(", ")
+              combo_arg_sig = method.args.map { |arg| idx += 1; "#{arg.name} : #{combo[idx].id}" }.join(", ")
               if !src.keys.includes?(constant_name)
                 sends[constant_name] = {} of String => String
                 src[constant_name] = {} of String => String
               end
-              signature = method.args.map {|arg| "#{arg.name} : #{arg.restriction}"}.join(", ")
-              sends[constant_name][combo_arg_sig] = method.args.map {|arg| arg.name}.join(", ")
-              src[constant_name][method.name.stringify] = "Send_#{method.name}_#{restriction.gsub(/::/,"CXOLOXN").id}"
+              signature = method.args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ")
+              sends[constant_name][combo_arg_sig] = {
+                "args"      => method.args.map { |arg| arg.name }.join(", "),
+                "use_procs" => use_procs,
+              }
+              src[constant_name][method.name.stringify] = "Send_#{method.name}_#{restriction.gsub(/::/, "CXOLOXN").id}"
             end
           end
         end
@@ -101,7 +111,7 @@ module Send
   # callsites.
   macro build_callsites
     {% use_procs = !@type.annotations(SendViaProc).empty? %}
-    {% for method in @type.methods.reject {|method| method.args.any? {|arg| arg.restriction.is_a?(Nop)}} %}
+    {% for method in @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } } %}
       {% method_args = method.args %}
       {% method_name = method.name %}
       {% if use_procs == true %}
@@ -131,9 +141,21 @@ module Send
   #
   # So....how to do this?
   macro build_method_sends
-    {% use_procs = !@type.annotations(SendViaProc).empty? %}
+    {% class_use_procs = !@type.annotations(SendViaProc).empty? %}
     {% for constant, hsh in SendParameters %}
-    {% for signature, args in hsh %}
+    {% for signature, argn in hsh %}
+    {%
+      args = argn["args"]
+      upn = argn["use_procs"]
+      if upn == "Y"
+        use_procs = true
+      elsif upn == "N"
+        use_procs = false
+      else
+        use_procs = class_use_procs
+      end
+    %}
+    
     def __send__(method : String, {{ signature.id }})
       begin
       {% if use_procs == true %}

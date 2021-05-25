@@ -18,6 +18,7 @@ class TestObj
     val * val2 + 1
   end
 
+  @[SendViaProc]
   def exponent(xx : Int32, yy : Int32) : BigInt
     BigInt.new(xx) ** yy
   end
@@ -40,6 +41,7 @@ class OtherTestObj
   end
 
   alias Num = Int::Signed | Int::Unsigned | Float::Primitive
+
   def num_or_string_to_bigint(val : String | Num)
     BigInt.new(val.is_a?(Float) ? val.to_i128 : val.to_s)
   end
@@ -48,6 +50,7 @@ class OtherTestObj
     x * y
   end
 
+  @[SendViaRecord]
   def multimultiply(x : String | Int16 | Int32, y : String | Int16 | Int32)
     x.to_i32 * y.to_i32
   end
@@ -126,6 +129,12 @@ describe Send do
     othertest.send("num_or_string_to_bigint", 7).should eq BigInt.new(7)
     othertest.send("num_or_string_to_bigint", 9.83).should eq BigInt.new(9)
     othertest.send("num_or_string_to_bigint", "115792089237316195423570985008687907853269984665640564039457584007913129639936").should eq BigInt.new("115792089237316195423570985008687907853269984665640564039457584007913129639936")
+  end
+
+  it "can use annotations to specify whether to use a proc or a record callsite" do
+    TestObj::Send_exponent_Int32__Int32.is_a?(Proc).should be_false
+    TestObj::Send_exponent_Int32__Int32.is_a?(Class).should be_true
+    OtherTestObj::Send_multimultiply_Int16_Int32_String__Int16_Int32_String.is_a?(Proc).should be_true
   end
 
   if ENV.has_key?("BENCHMARK")
