@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="generator" content="Crystal Docs 0.36.1">
+<meta name="crystal_docs.project_version" content="0.1.0">
+<meta name="crystal_docs.project_name" content="send">
+
+
+
+<link href="css/style.css" rel="stylesheet" type="text/css" />
+<script type="text/javascript" src="js/doc.js"></script>
+
+  <meta name="repository-name" content="send">
+  <title>Send - send 0.1.0</title>
+  <script type="text/javascript">
+    CrystalDocs.base_path = "";
+  </script>
+</head>
+<body>
+
+<svg class="hidden">
+  <symbol id="octicon-link" viewBox="0 0 16 16">
+    <path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path>
+  </symbol>
+</svg>
+<div class="sidebar">
+  <div class="sidebar-header">
+    <div class="search-box">
+      <input type="search" class="search-input" placeholder="Search..." spellcheck="false" aria-label="Search">
+    </div>
+
+    <div class="project-summary">
+      <h1 class="project-name">
+        <a href="index.html">
+          send
+        </a>
+      </h1>
+
+      <span class="project-version">
+        0.1.0
+      </span>
+    </div>
+  </div>
+
+  <div class="search-results hidden">
+    <ul class="search-list"></ul>
+  </div>
+
+  <div class="types-list">
+    <ul>
+  
+  <li class="parent open current" data-id="send/Send" data-name="send">
+      <a href="Send.html">Send</a>
+      
+        <ul>
+  
+  <li class=" " data-id="send/Send/MethodMissing" data-name="send::methodmissing">
+      <a href="Send/MethodMissing.html">MethodMissing</a>
+      
+    </li>
+  
+</ul>
+
+      
+    </li>
+  
+  <li class=" " data-id="send/SendViaProc" data-name="sendviaproc">
+      <a href="SendViaProc.html">SendViaProc</a>
+      
+    </li>
+  
+  <li class=" " data-id="send/SendViaRecord" data-name="sendviarecord">
+      <a href="SendViaRecord.html">SendViaRecord</a>
+      
+    </li>
+  
+</ul>
+
+  </div>
+</div>
+
+
+<div class="main-content">
+<h1 class="type-name">
+
+  <span class="kind">module</span> Send
+
+</h1>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2>
+    <a id="defined-in" class="anchor" href="#defined-in">
+  <svg class="octicon-link" aria-hidden="true">
+    <use href="#octicon-link"/>
+  </svg>
+</a>
+    Defined in:
+  </h2>
+  
+    
+      send.cr
+    
+    <br/>
+  
+
+
+
+  
+    <h2>
+      <a id="constant-summary" class="anchor" href="#constant-summary">
+  <svg class="octicon-link" aria-hidden="true">
+    <use href="#octicon-link"/>
+  </svg>
+</a>
+      Constant Summary
+    </h2>
+  
+  <dl>
+    
+      <dt class="entry-const" id="VERSION">
+        <strong>VERSION</strong> = <code><span class="s">&quot;0.1.0&quot;</span></code>
+      </dt>
+      
+    
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2>
+    <a id="macro-summary" class="anchor" href="#macro-summary">
+  <svg class="octicon-link" aria-hidden="true">
+    <use href="#octicon-link"/>
+  </svg>
+</a>
+    Macro Summary
+  </h2>
+  <ul class="list-summary">
+    
+      <li class="entry-summary">
+        <a href="#build_callsites-macro" class="signature"><strong>build_callsites</strong></a>
+        
+          <div class="summary"><p>There are two approaches to providing callsites for invoking methods which are currently provided by this library.</p></div>
+        
+      </li>
+    
+      <li class="entry-summary">
+        <a href="#build_lookup_constants-macro" class="signature"><strong>build_lookup_constants</strong></a>
+        
+      </li>
+    
+      <li class="entry-summary">
+        <a href="#build_method_sends-macro" class="signature"><strong>build_method_sends</strong></a>
+        
+          <div class="summary"><p>Send needs to find the right method to call, in a world where type unions exist and are common.</p></div>
+        
+      </li>
+    
+      <li class="entry-summary">
+        <a href="#build_type_label_lookups-macro" class="signature"><strong>build_type_label_lookups</strong></a>
+        
+          <div class="summary"><p>Yeah, I realize that there is a line here that is horrible.</p></div>
+        
+      </li>
+    
+      <li class="entry-summary">
+        <a href="#build_type_lookups-macro" class="signature"><strong>build_type_lookups</strong></a>
+        
+      </li>
+    
+      <li class="entry-summary">
+        <a href="#send_init-macro" class="signature"><strong>send_init</strong></a>
+        
+      </li>
+    
+  </ul>
+
+
+
+<div class="methods-inherited">
+  
+</div>
+
+
+
+
+
+
+
+
+  <h2>
+    <a id="macro-detail" class="anchor" href="#macro-detail">
+  <svg class="octicon-link" aria-hidden="true">
+    <use href="#octicon-link"/>
+  </svg>
+</a>
+    Macro Detail
+  </h2>
+  
+    <div class="entry-detail" id="build_callsites-macro">
+      <div class="signature">
+        
+        macro <strong>build_callsites</strong>
+
+        <a class="method-permalink" href="#build_callsites-macro">#</a>
+      </div>
+      
+        <div class="doc">
+          
+          <p>There are two approaches to providing callsites for invoking methods
+which are currently provided by this library. One approach is to create
+a bunch of Proc objects which wrap the method calls. The lookup tables
+can be used to find the correct Proc to call. The other approach is to
+create a set of <code>record</code>s which take the same argument set as the method
+that it maps to. A <code>call</code> method exists on the record, and when invoked,
+it calls the method using the arguments that were used to create the
+record.</p>
+
+<p>This macro builds the callsites to send methods to. It defaults to using
+record structs to implement the callsites, but if passed a <code>true</code> when the
+macro is invoked, it will build the callsite using a Proc instead. Callsites
+built with a record are as fast as direct method invocations, when compiled
+with <code>--release</code>, but they suffer from some type restrictions that the Proc
+method do not suffer from. Namely, there are some types, such as <code>Number</code>,
+which can be used in a type or type union on a Proc, but which can not be
+used on an instance variable, which record-type callsites use. However,
+dynamic dispatch using Proc-type callsites is slower than with record-type
+callsites.</p>
+        </div>
+      
+      <br/>
+      <div>
+        
+      </div>
+    </div>
+  
+    <div class="entry-detail" id="build_lookup_constants-macro">
+      <div class="signature">
+        
+        macro <strong>build_lookup_constants</strong>
+
+        <a class="method-permalink" href="#build_lookup_constants-macro">#</a>
+      </div>
+      
+      <br/>
+      <div>
+        
+      </div>
+    </div>
+  
+    <div class="entry-detail" id="build_method_sends-macro">
+      <div class="signature">
+        
+        macro <strong>build_method_sends</strong>
+
+        <a class="method-permalink" href="#build_method_sends-macro">#</a>
+      </div>
+      
+        <div class="doc">
+          
+          <p>Send needs to find the right method to call, in a world where type unions exist and are
+common. This may not be the right approach, but it is an approach, and it what I am starting
+with.</p>
+
+<p>The basic problem is that if, say, you have a method that takes a <code>String | Int32</code>, and you
+also have a method that takes only an <code>Int32</code>, you will end up with two overloaded <code>send</code>
+methods. If you try to send to the method that takes the union, using a <code>String</code>, it will
+work as expected. However, if you try to send to the method that takes the union, using an
+Int32, the <code>send</code> that takes Int32 will be called, and it needs to be able to find the
+method that takes the union type.</p>
+
+<p>So....how to do this?</p>
+        </div>
+      
+      <br/>
+      <div>
+        
+      </div>
+    </div>
+  
+    <div class="entry-detail" id="build_type_label_lookups-macro">
+      <div class="signature">
+        
+        macro <strong>build_type_label_lookups</strong>
+
+        <a class="method-permalink" href="#build_type_label_lookups-macro">#</a>
+      </div>
+      
+        <div class="doc">
+          
+          <p>Yeah, I realize that there is a line here that is horrible. Forgive me.</p>
+        </div>
+      
+      <br/>
+      <div>
+        
+      </div>
+    </div>
+  
+    <div class="entry-detail" id="build_type_lookups-macro">
+      <div class="signature">
+        
+        macro <strong>build_type_lookups</strong>
+
+        <a class="method-permalink" href="#build_type_lookups-macro">#</a>
+      </div>
+      
+      <br/>
+      <div>
+        
+      </div>
+    </div>
+  
+    <div class="entry-detail" id="send_init-macro">
+      <div class="signature">
+        
+        macro <strong>send_init</strong>
+
+        <a class="method-permalink" href="#send_init-macro">#</a>
+      </div>
+      
+      <br/>
+      <div>
+        
+      </div>
+    </div>
+  
+
+
+</div>
+
+</body>
+</html>
