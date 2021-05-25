@@ -7,12 +7,28 @@ annotation SendViaRecord
 end
 
 module Send
-  VERSION = "0.1.2"
+  VERSION = "0.1.3"
 
   class MethodMissing < Exception; end
 
   # Yeah, I realize that there is a line here that is horrible. Forgive me.
   macro build_type_label_lookups
+    SendMethodPunctuationLookups = {
+      /\s*\<\s*/ => "LXESXS",
+      /\s*\=\s*/ => "EXQUALXS",
+      /\s*\!\s*/ => "EXXCLAMATIOXN",
+      /\s*\~\s*/ => "TXILDXE",
+      /\s*\>\s*/ => "GXREATEXR",
+      /\s*\+\s*/ => "PXLUXS",
+      /\s*\-\s*/ => "MXINUXS",
+      /\s*\*\s*/ => "AXSTERISXK",
+      /\s*\/\s*/ => "SXLASXH",
+      /\s*\%\s*/ => "PXERCENXT",
+      /\s*\&\s*/ => "AXMPERSANXD",
+      /\s*\?\s*/ => "QXUESTIOXN",
+      /\s*\[\s*/ => "LXBRACKEXT",
+      /\s*\]\s*/ => "RXBRACKEXT"
+    }
     MethodTypeLabel = {
     {% for method in @type.methods %}
       {{method.args.symbolize}} => {{
@@ -79,7 +95,11 @@ module Send
                 "args"      => method.args.map(&.name).join(", "),
                 "use_procs" => use_procs,
               }
-              src[constant_name][method.name.stringify] = "Send_#{method.name.gsub(/\s*=\s*/,"EXQUALXS").gsub(/\s*\?\s*/,"QXUESTIOXN")}_#{restriction.gsub(/::/, "CXOLOXN").id}"
+              method_name = method.name
+              SendMethodPunctuationLookups.each do |punct, name|
+                method_name = method_name.gsub(punct, name)
+              end
+              src[constant_name][method.name.stringify] = "Send_#{method_name}_#{restriction.gsub(/::/, "CXOLOXN").id}"
             end
           end
         end
@@ -122,7 +142,12 @@ module Send
     {% for method in @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } } %}
       {% method_args = method.args %}
       {% method_name = method.name %}
-      {% safe_method_name = method_name.gsub(/\s*=\s*/,"EXQUALXS").gsub(/\s*\?\s*/, "QXUESTIOXN") %}
+      {%
+        safe_method_name = method_name
+        SendMethodPunctuationLookups.each do |punct, name|
+          safe_method_name = safe_method_name.gsub(punct, name)
+        end
+      %}
       {% if use_procs == true %}
         Send_{{ safe_method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
           obj.{{ method_name }}({{ method_args.map(&.name).join(", ").id }})

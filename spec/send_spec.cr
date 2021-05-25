@@ -41,6 +41,14 @@ class TestObj
     @test
   end
 
+  def [](val : Int::Signed | Int::Unsigned)
+    @test.to_s[val]
+  end
+
+  def <=>(val : String | Int::Signed | Int::Unsigned)
+    @test.to_s <=> val.to_s
+  end
+
   def test?
     @test ? true : false
   end
@@ -169,9 +177,10 @@ describe Send do
   it "can call methods with an equal sign or question mark in their name" do
     test = TestObj.new
 
-    test.send("test=", 7)
+    test.send("test=",7)
     test.send("test").should eq 7
     test.send("test?").should be_true
+    test.send("[]", 0).should eq '7'
   end
 
   if ENV.has_key?("BENCHMARK")
