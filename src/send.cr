@@ -7,7 +7,7 @@ annotation SendViaRecord
 end
 
 module Send
-  VERSION = "0.1.0"
+  VERSION = "0.1.1"
 
   class MethodMissing < Exception; end
 
