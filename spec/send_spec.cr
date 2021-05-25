@@ -2,6 +2,8 @@ require "./spec_helper"
 require "big"
 
 class TestObj
+  @test : String | Int::Signed | Int::Unsigned = ""
+
   def nulltest
     true
   end
@@ -29,6 +31,18 @@ class TestObj
 
   def broken(foo)
     foo
+  end
+
+  def test=(val : String | Int::Signed | Int::Unsigned)
+    @test = val
+  end
+
+  def test
+    @test
+  end
+
+  def test?
+    @test ? true : false
   end
 
   include Send
@@ -150,6 +164,14 @@ describe Send do
     test.send("simple_addition", 7)
     test.send("simple_addition", x: 7)
     test.send(method: "multiply", xx: 7, yy: 9).should eq 63
+  end
+
+  it "can call methods with an equal sign or question mark in their name" do
+    test = TestObj.new
+
+    test.send("test=", 7)
+    test.send("test").should eq 7
+    test.send("test?").should be_true
   end
 
   if ENV.has_key?("BENCHMARK")

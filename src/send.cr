@@ -7,7 +7,7 @@ annotation SendViaRecord
 end
 
 module Send
-  VERSION = "0.1.1"
+  VERSION = "0.1.2"
 
   class MethodMissing < Exception; end
 
@@ -79,7 +79,7 @@ module Send
                 "args"      => method.args.map(&.name).join(", "),
                 "use_procs" => use_procs,
               }
-              src[constant_name][method.name.stringify] = "Send_#{method.name}_#{restriction.gsub(/::/, "CXOLOXN").id}"
+              src[constant_name][method.name.stringify] = "Send_#{method.name.gsub(/\s*=\s*/,"EXQUALXS").gsub(/\s*\?\s*/,"QXUESTIOXN")}_#{restriction.gsub(/::/, "CXOLOXN").id}"
             end
           end
         end
@@ -122,12 +122,13 @@ module Send
     {% for method in @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } } %}
       {% method_args = method.args %}
       {% method_name = method.name %}
+      {% safe_method_name = method_name.gsub(/\s*=\s*/,"EXQUALXS").gsub(/\s*\?\s*/, "QXUESTIOXN") %}
       {% if use_procs == true %}
-        Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
+        Send_{{ safe_method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
           obj.{{ method_name }}({{ method_args.map(&.name).join(", ").id }})
         end
       {% else %}
-        record Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }}, obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
+        record Send_{{ safe_method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }}, obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
           def call
             obj.{{ method_name }}({{ method_args.map(&.name).join(", ").id }})
           end
