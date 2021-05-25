@@ -290,7 +290,7 @@ send via record callsites 383.23M (  2.61ns) (Â± 3.04%)  0.0B/op   1.00x slowe
   </svg>
 </a>Development</h2>
 
-<p><span class="flag orange">TODO</span>  Write development instructions here</p>
+<p>I am putting this here mostly as a note to myself, but the current approach is to iterate on the defined methods at the end of the class definition. It might be better if the code were included at the start of the class definition, since that is a pretty standard practice, and then to replace the iteration with a <code>method_added</code> hook that does all of the analysis and code generation for each method, one at a time.</p>
 
 <h2><a id="contributing" class="anchor" href="#contributing">
   <svg class="octicon-link" aria-hidden="true">
