@@ -137,6 +137,21 @@ describe Send do
     OtherTestObj::Send_multimultiply_Int16_Int32_String__Int16_Int32_String.is_a?(Proc).should be_true
   end
 
+  # Named parameter support is unavoidably flakey in the current implementation.
+  # Send can not overload to methods with the same type signature, but different parameter
+  # names. So, while the code will attempt to define a send for every combination of
+  # parameter name and type, only the last one of any particular type signature combination
+  # will actually exist when the code is compiled.
+  #
+  # TODO: Is there a way to leverage splats and double-splats to get around this problem?
+  it "can call methods using named parameters" do
+    test = TestObj.new
+
+    test.send("simple_addition", 7)
+    test.send("simple_addition", x: 7)
+    test.send(method: "multiply", xx: 7, yy: 9).should eq 63
+  end
+
   if ENV.has_key?("BENCHMARK")
     it "runs benchmarks" do
       puts "\n\nBenchmarks..."

@@ -111,6 +111,24 @@ A possible partial remediation that would allow one to retrofit the ability to u
 
 This can be supported. The code to do it is still just TODO.
 
+### Named argument support is flakey
+
+Consider two method definitions:
+
+```crystal
+def a(b : Int32)
+  puts "b is #{b}"
+end
+
+def a(c : Int32)
+  puts "c is #{c}"
+end
+```
+
+Only the last one defined, `a(c : Int32)`, will exist in the compiled code. So if you have different methods with the same type signatures, only the last one defined can be addressed using named arguments.
+
+TODO is to see if there is a way to leverage splats and double splats in the send implementation so that all argument handling just works the way that one would expect.
+
 ## Installation
 
 1. Add the dependency to your `shard.yml`:
