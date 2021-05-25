@@ -68,7 +68,7 @@ module Send
               end
               signature = method.args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ")
               sends[constant_name][combo_arg_sig] = {
-                "args"      => method.args.map { |arg| arg.name }.join(", "),
+                "args"      => method.args.map(&.name).join(", "),
                 "use_procs" => use_procs,
               }
               src[constant_name][method.name.stringify] = "Send_#{method.name}_#{restriction.gsub(/::/, "CXOLOXN").id}"
@@ -116,12 +116,12 @@ module Send
       {% method_name = method.name %}
       {% if use_procs == true %}
         Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
-          obj.{{ method_name }}({{ method_args.map { |method| method.name }.join(", ").id }})
+          obj.{{ method_name }}({{ method_args.map(&.name).join(", ").id }})
         end
       {% else %}
         record Send_{{ method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }}, obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
           def call
-            obj.{{ method_name }}({{ method_args.map { |method| method.name }.join(", ").id }})
+            obj.{{ method_name }}({{ method_args.map(&.name).join(", ").id }})
           end
         end
       {% end %}
