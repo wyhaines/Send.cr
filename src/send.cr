@@ -1,19 +1,27 @@
 require "benchmark"
 
+# Classes or methods with this annotation will use a Proc to wrap method calls.
 annotation SendViaProc
 end
 
+# Classes or methods with this annotation will use a record to wrap method calls.
 annotation SendViaRecord
+end
+
+# Methods with this annotation will be skipped when building send call sites.
+annotation SendSkip
 end
 
 module Send
   VERSION = "0.1.3"
 
+  # This excption will be raised if 'send' is invoked for a method that
+  # is not mapped.
   class MethodMissing < Exception; end
 
-  # Yeah, I realize that there is a line here that is horrible. Forgive me.
-  macro build_type_label_lookups
-    SendMethodPunctuationLookups = {
+  # This macros
+  macro build_type_lookup_table
+    Xtn::SendMethodPunctuationLookups = {
       /\s*\<\s*/ => "LXESXS",
       /\s*\=\s*/ => "EXQUALXS",
       /\s*\!\s*/ => "EXXCLAMATIOXN",
@@ -29,7 +37,7 @@ module Send
       /\s*\[\s*/ => "LXBRACKEXT",
       /\s*\]\s*/ => "RXBRACKEXT"
     }
-    MethodTypeLabel = {
+    Xtn::SendTypeLookupByLabel = {
     {% for method in @type.methods %}
       {{method.args.symbolize}} => {{
                                      method.args.reject do |arg|
@@ -48,11 +56,15 @@ module Send
     {%
       src = {} of String => Hash(String, String)
       sends = {} of String => Hash(String, Hash(String, String))
-      @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.map { |method| MethodTypeLabel[method.args.symbolize] }.uniq.each do |restriction|
+      @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.map { |method| Xtn::SendTypeLookupByLabel[method.args.symbolize] }.uniq.each do |restriction|
         base = restriction.split("__")
-        permutations = restriction.split("__").map do |elem|
+
+        # Figuring out all of the type permutations iteratively took some thinking.
+        # The first step is to figre out how many combinations there are.
+        permutations = base.map do |elem|
           elem.split("_").size
         end.reduce(1) { |a, x| a *= x }
+
         combos = [] of Array(String)
         (1..permutations).each { combos << [] of String }
         permutations_step = permutations
@@ -74,9 +86,9 @@ module Send
 
         combos.each do |combo|
           combo_string = combo.join("__").id
-          constant_name = "SendLookup___#{combo.map { |c| c.gsub(/::/, "CXOLOXN") }.join("__").id}" # ameba:disable Style/VerboseBlock
+          constant_name = "Xtn::SendLookup___#{combo.map { |c| c.gsub(/::/, "CXOLOXN") }.join("__").id}" # ameba:disable Style/VerboseBlock
           @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.each do |method|
-            if restriction == MethodTypeLabel[method.args.symbolize]
+            if restriction == Xtn::SendTypeLookupByLabel[method.args.symbolize]
               if !method.annotations(SendViaProc).empty?
                 use_procs = "Y:"
               elsif !method.annotations(SendViaRecord).empty?
@@ -96,23 +108,23 @@ module Send
                 "use_procs" => use_procs,
               }
               method_name = method.name
-              SendMethodPunctuationLookups.each do |punct, name|
+              Xtn::SendMethodPunctuationLookups.each do |punct, name|
                 method_name = method_name.gsub(punct, name)
               end
-              src[constant_name][method.name.stringify] = "Send_#{method_name}_#{restriction.gsub(/::/, "CXOLOXN").id}"
+              src[constant_name][method.name.stringify] = "Xtn::Send_#{method_name}_#{restriction.gsub(/::/, "CXOLOXN").id}"
             end
           end
         end
       end
     %}
-    SendRawCombos = {{src.stringify.id}}
-    SendParameters = {{sends.stringify.id}}
+    Xtn::SendRawCombos = {{src.stringify.id}}
+    Xtn::SendParameters = {{sends.stringify.id}}
   end
 
   macro build_lookup_constants
-    {% combo_keys = SendRawCombos.keys %}
+    {% combo_keys = Xtn::SendRawCombos.keys %}
     {% for constant_name in combo_keys %}
-    {% hsh = SendRawCombos[constant_name] %}
+    {% hsh = Xtn::SendRawCombos[constant_name] %}
     {{ constant_name.id }} = {
       {% for method_name, callsite in hsh %}{{method_name}}: {{callsite.id}},
       {% end %}}{% end %}
@@ -140,20 +152,21 @@ module Send
   macro build_callsites
     {% use_procs = !@type.annotations(SendViaProc).empty? %}
     {% for method in @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } } %}
-      {% method_args = method.args %}
-      {% method_name = method.name %}
       {%
+        method_args = method.args
+        method_name = method.name
+
         safe_method_name = method_name
-        SendMethodPunctuationLookups.each do |punct, name|
+        Xtn::SendMethodPunctuationLookups.each do |punct, name|
           safe_method_name = safe_method_name.gsub(punct, name)
         end
       %}
       {% if use_procs == true %}
-        Send_{{ safe_method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
+        Xtn::Send_{{ safe_method_name }}_{{ Xtn::SendTypeLookupByLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
           obj.{{ method_name }}({{ method_args.map(&.name).join(", ").id }})
         end
       {% else %}
-        record Send_{{ safe_method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }}, obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
+        record Xtn::Send_{{ safe_method_name }}_{{ Xtn::SendTypeLookupByLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }}, obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
           def call
             obj.{{ method_name }}({{ method_args.map(&.name).join(", ").id }})
           end
@@ -176,7 +189,7 @@ module Send
   # So....how to do this?
   macro build_method_sends
     {% class_use_procs = !@type.annotations(SendViaProc).empty? %}
-    {% for constant, hsh in SendParameters %}
+    {% for constant, hsh in Xtn::SendParameters %}
     {% for signature, argn in hsh %}
     {%
       args = argn["args"]
@@ -224,15 +237,11 @@ module Send
     {% end %}
   end
 
-  macro send_init
-    build_type_label_lookups
+  macro included
+    build_type_lookup_table
     build_type_lookups
     build_lookup_constants
     build_callsites
     build_method_sends
-  end
-
-  macro included
-    send_init
   end
 end
