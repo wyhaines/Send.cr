@@ -9,10 +9,12 @@ end
 module Send
   VERSION = "0.1.3"
 
+  # This excption will be raised if 'send' is invoked for a method that
+  # is not mapped.
   class MethodMissing < Exception; end
 
-  # Yeah, I realize that there is a line here that is horrible. Forgive me.
-  macro build_type_label_lookups
+  #This macros 
+  macro build_type_lookup_table
     SendMethodPunctuationLookups = {
       /\s*\<\s*/ => "LXESXS",
       /\s*\=\s*/ => "EXQUALXS",
@@ -29,7 +31,7 @@ module Send
       /\s*\[\s*/ => "LXBRACKEXT",
       /\s*\]\s*/ => "RXBRACKEXT"
     }
-    MethodTypeLabel = {
+    SendTypeLookupByLabel = {
     {% for method in @type.methods %}
       {{method.args.symbolize}} => {{
                                      method.args.reject do |arg|
@@ -48,11 +50,15 @@ module Send
     {%
       src = {} of String => Hash(String, String)
       sends = {} of String => Hash(String, Hash(String, String))
-      @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.map { |method| MethodTypeLabel[method.args.symbolize] }.uniq.each do |restriction|
+      @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.map { |method| SendTypeLookupByLabel[method.args.symbolize] }.uniq.each do |restriction|
         base = restriction.split("__")
-        permutations = restriction.split("__").map do |elem|
+
+        # Figuring out all of the type permutations iteratively took some thinking.
+        # The first step is to figre out how many combinations there are.
+        permutations = base.map do |elem|
           elem.split("_").size
         end.reduce(1) { |a, x| a *= x }
+
         combos = [] of Array(String)
         (1..permutations).each { combos << [] of String }
         permutations_step = permutations
@@ -76,7 +82,7 @@ module Send
           combo_string = combo.join("__").id
           constant_name = "SendLookup___#{combo.map { |c| c.gsub(/::/, "CXOLOXN") }.join("__").id}" # ameba:disable Style/VerboseBlock
           @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.each do |method|
-            if restriction == MethodTypeLabel[method.args.symbolize]
+            if restriction == SendTypeLookupByLabel[method.args.symbolize]
               if !method.annotations(SendViaProc).empty?
                 use_procs = "Y:"
               elsif !method.annotations(SendViaRecord).empty?
@@ -149,11 +155,11 @@ module Send
         end
       %}
       {% if use_procs == true %}
-        Send_{{ safe_method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
+        Send_{{ safe_method_name }}_{{ SendTypeLookupByLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
           obj.{{ method_name }}({{ method_args.map(&.name).join(", ").id }})
         end
       {% else %}
-        record Send_{{ safe_method_name }}_{{ MethodTypeLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }}, obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
+        record Send_{{ safe_method_name }}_{{ SendTypeLookupByLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }}, obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
           def call
             obj.{{ method_name }}({{ method_args.map(&.name).join(", ").id }})
           end
@@ -225,7 +231,7 @@ module Send
   end
 
   macro send_init
-    build_type_label_lookups
+    build_type_lookup_table
     build_type_lookups
     build_lookup_constants
     build_callsites
