@@ -1,89 +1,6 @@
 require "./spec_helper"
 require "big"
 
-class TestObj
-  @test : String | Int::Signed | Int::Unsigned = ""
-
-  def nulltest
-    true
-  end
-
-  def simple_addition(val : Int32)
-    val + 7
-  end
-
-  def multiply(x : Int32, y : Int32)
-    x * y
-  end
-
-  def multiply_plus(val : Int32, val2 : Int32)
-    val * val2 + 1
-  end
-
-  @[SendViaProc]
-  def exponent(xx : Int32, yy : Int32) : BigInt
-    BigInt.new(xx) ** yy
-  end
-
-  def complex(x : String | Int32)
-    x.to_s
-  end
-
-  def broken(foo)
-    foo
-  end
-
-  def test=(val : String | Int::Signed | Int::Unsigned)
-    @test = val
-  end
-
-  def test
-    @test
-  end
-
-  def [](val : Int::Signed | Int::Unsigned)
-    @test.to_s[val]
-  end
-
-  def <=>(val : String | Int::Signed | Int::Unsigned)
-    @test.to_s <=> val.to_s
-  end
-
-  def test?
-    @test ? true : false
-  end
-
-  include Send
-end
-
-@[SendViaProc]
-class OtherTestObj
-  def nulltest
-    true
-  end
-
-  alias Num = Int::Signed | Int::Unsigned | Float::Primitive
-
-  def num_or_string_to_bigint(val : String | Num)
-    BigInt.new(val.is_a?(Float) ? val.to_i128 : val.to_s)
-  end
-
-  def multiply(x : Int32, y : Int32)
-    x * y
-  end
-
-  @[SendViaRecord]
-  def multimultiply(x : String | Int16 | Int32, y : String | Int16 | Int32)
-    x.to_i32 * y.to_i32
-  end
-
-  def complex(x : String | Int32)
-    x.to_s
-  end
-
-  include Send
-end
-
 describe Send do
   it "can send messages to methods with simple type signatures" do
     test = TestObj.new
@@ -181,6 +98,21 @@ describe Send do
     test.send("test").should eq 7
     test.send("test?").should be_true
     test.send("[]", 0).should eq '7'
+  end
+
+  it "can check the arity of a method at runtime" do
+    test = TestObj.new
+
+    test.arity(:test=).size.should eq 2
+    test.arity("test=").includes?((1..1)).should be_true
+    test.arity(:test=).includes?((0..1)).should be_true
+  end
+
+  it "can check if an instance responds to a given method by string name" do
+    test = TestObj.new
+
+    test.runtime_responds_to?("test?").should be_true
+    test.runtime_responds_to?(:test=).should be_true
   end
 
   if ENV.has_key?("BENCHMARK")

@@ -21,6 +21,7 @@ module Send
 
   # This macros
   macro build_type_lookup_table
+    # Constant lookup table for our punctuation conversions.
     Xtn::SendMethodPunctuationLookups = {
       /\s*\<\s*/ => "LXESXS",
       /\s*\=\s*/ => "EXQUALXS",
@@ -37,6 +38,8 @@ module Send
       /\s*\[\s*/ => "LXBRACKEXT",
       /\s*\]\s*/ => "RXBRACKEXT"
     }
+
+    # This lookup table stores an association of method call signature to method type union, encoded.
     Xtn::SendTypeLookupByLabel = {
     {% for method in @type.methods %}
       {{method.args.symbolize}} => {{
@@ -48,6 +51,21 @@ module Send
                                        end.join("_") : arg.restriction.id.gsub(/ \| /, "_").id
                                      end.join("__")
                                    }},
+    {% end %}
+    }
+
+    # This little table stores the arity of all of the methods, allowing this to be queried at runtime.
+    Xtn::SendArity = Hash(String, Array(Range(Int32, Int32))).new {|h, k| h[k] = [] of Range(Int32, Int32)}
+    {% for method in @type.methods %}
+      {% min = method.args.reject {|m| m.default_value ? true : m.default_value == nil ? true : false}.size %}
+      Xtn::SendArity[{{ method.name.stringify }}] << Range.new({{ min }}, {{ method.args.size }})
+    {% end %}
+
+    # This lookup table just captures all of the method names, both as *String* and as *Symbol*,
+    # allowing runtime lookup of method names by string.
+    Xtn::SendRespondsTo = {
+    {% for method in @type.methods.map(&.name).uniq %}
+      "{{ method }}": true,
     {% end %}
     }
   end
@@ -185,8 +203,6 @@ module Send
   # work as expected. However, if you try to send to the method that takes the union, using an
   # Int32, the `send` that takes Int32 will be called, and it needs to be able to find the
   # method that takes the union type.
-  #
-  # So....how to do this?
   macro build_method_sends
     {% class_use_procs = !@type.annotations(SendViaProc).empty? %}
     {% for constant, hsh in Xtn::SendParameters %}
@@ -243,5 +259,20 @@ module Send
     build_lookup_constants
     build_callsites
     build_method_sends
+
+    # The standard #responds_to? only takes a symbol, and Crystal doesn't permit
+    # String => Symbol, so if one wants to determine if a method exists, where the
+    # method name is being built from a String at runtime, there has to be another
+    # method to provide this service.
+    #
+    # `runtime_responds_to?` should, effectively, work just like the builtin method,
+    # but it can handle strings as well as symbols.
+    def runtime_responds_to?(method : String | Symbol)
+      Xtn::SendRespondsTo[method.to_s.tr(":","")]? || false
+    end
+
+    def arity(method : String | Symbol)
+      Xtn::SendArity[method.to_s.tr(":","")]? || [(..)]
+    end
   end
 end
