@@ -104,7 +104,7 @@ module Send
 
         combos.each do |combo|
           combo_string = combo.join("__").id
-          constant_name = "Xtn::SendLookup___#{combo.map { |c| c.gsub(/::/, "CXOLOXN") }.join("__").id}" # ameba:disable Style/VerboseBlock
+          constant_name = "Xtn::SendLookup___#{combo.map { |c| c.gsub(/[\(\)]/,"PXAREXN").gsub(/::/, "CXOLOXN") }.join("__").id}" # ameba:disable Style/VerboseBlock
           @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.each do |method|
             if restriction == Xtn::SendTypeLookupByLabel[method.args.symbolize]
               if !method.annotations(SendViaProc).empty?
@@ -247,6 +247,22 @@ module Send
     end
     def send?(method : String, {{ signature.id }})
       __send__?(method, {{ args.id }})
+    end
+
+    # This incarnation of `#__send__` is a honeypot, to capture method invocations
+    # that fail to match anywhere else, which may happen if we try to call a method
+    # which does not exist, but we want a runtime error instead of a compile time error.
+    def __send__(method : String, *honeypot_args)
+      raise MethodMissing.new("Can not send to '#{method}'; check that it exists and all arguments have type specifications.")
+    end
+    def send(method : String, *honeypot_args)
+      __send__(method, *honeypot_args)
+    end
+    def __send__?(method : String, *honeypot_args)
+      raise MethodMissing.new("Can not send to '#{method}'; check that it exists and all arguments have type specifications.")
+    end
+    def send?(method : String, *honeypot_args)
+      __send__?(method, *honeypot_args)
     end
 
     {% end %}
