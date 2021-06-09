@@ -23,27 +23,27 @@ module Send
   macro build_type_lookup_table
     # Constant lookup table for our punctuation conversions.
     Xtn::SendMethodPunctuationLookups = {
-      "LXESXS": /\s*\<\s*/,
-      "EXQUALXS": /\s*\=\s*/,
-      "EXXCLAMATIOXN": /\s*\!\s*/,
-      "TXILDXE": /\s*\~\s*/,
-      "GXREATEXR": /\s*\>\s*/,
-      "PXLUXS": /\s*\+\s*/,
-      "MXINUXS": /\s*\-\s*/,
-      "AXSTERISXK": /\s*\*\s*/,
-      "SXLASXH": /\s*\/\s*/,
-      "PXERCENXT": /\s*\%\s*/,
-      "AXMPERSANXD": /\s*\&\s*/,
-      "QXUESTIOXN": /\s*\?\s*/,
-      "LXBRACKEXT": /\s*\[\s*/,
-      "RXBRACKEXT": /\s*\]\s*/,
+      /\s*\<\s*/ => "LXESXS",
+      /\s*\=\s*/ => "EXQUALXS",
+      /\s*\!\s*/ => "EXXCLAMATIOXN",
+      /\s*\~\s*/ => "TXILDXE",
+      /\s*\>\s*/ => "GXREATEXR",
+      /\s*\+\s*/ => "PXLUXS",
+      /\s*\-\s*/ => "MXINUXS",
+      /\s*\*\s*/ => "AXSTERISXK",
+      /\s*\/\s*/ => "SXLASXH",
+      /\s*\%\s*/ => "PXERCENXT",
+      /\s*\&\s*/ => "AXMPERSANXD",
+      /\s*\?\s*/ => "QXUESTIOXN",
+      /\s*\[\s*/ => "LXBRACKEXT",
+      /\s*\]\s*/ => "RXBRACKEXT"
     }
 
     # This lookup table stores an association of method call signature to method type union, encoded.
     Xtn::SendTypeLookupByLabel = {
-    {% for args in @type.methods.map(&.args).uniq %}
-      {{args.stringify}}: {{
-                                     args.reject do |arg|
+    {% for method in @type.methods %}
+      {{method.args.symbolize}} => {{
+                                     method.args.reject do |arg|
                                        arg.restriction.is_a?(Nop)
                                      end.map do |arg|
                                        arg.restriction.resolve.union? ? arg.restriction.resolve.union_types.map do |ut|
@@ -126,8 +126,8 @@ module Send
                 "use_procs" => use_procs,
               }
               method_name = method.name
-              Xtn::SendMethodPunctuationLookups.each do |name, punct|
-                method_name = method_name.gsub(punct, name.stringify)
+              Xtn::SendMethodPunctuationLookups.each do |punct, name|
+                method_name = method_name.gsub(punct, name)
               end
               src[constant_name][method.name.stringify] = "Xtn::Send_#{method_name}_#{restriction.gsub(/::/, "CXOLOXN").id}"
             end
@@ -135,8 +135,8 @@ module Send
         end
       end
     %}
-    Xtn::SendRawCombos = {{src.stringify.gsub(/\s*=>/,":").id}}
-    Xtn::SendParameters = {{sends.stringify.gsub(/\s*=>/,":").id}}
+    Xtn::SendRawCombos = {{src.stringify.id}}
+    Xtn::SendParameters = {{sends.stringify.id}}
   end
 
   macro build_lookup_constants
@@ -144,7 +144,7 @@ module Send
     {% for constant_name in combo_keys %}
     {% hsh = Xtn::SendRawCombos[constant_name] %}
     {{ constant_name.id }} = {
-      {% for method_name, callsite in hsh %}{{method_name.stringify}}: {{callsite.id}},
+      {% for method_name, callsite in hsh %}{{method_name}}: {{callsite.id}},
       {% end %}}{% end %}
   end
 
@@ -175,8 +175,8 @@ module Send
         method_name = method.name
 
         safe_method_name = method_name
-        Xtn::SendMethodPunctuationLookups.each do |name, punct|
-          safe_method_name = safe_method_name.gsub(punct, name.stringify)
+        Xtn::SendMethodPunctuationLookups.each do |punct, name|
+          safe_method_name = safe_method_name.gsub(punct, name)
         end
       %}
       {% if use_procs == true %}
