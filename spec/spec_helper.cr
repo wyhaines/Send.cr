@@ -85,5 +85,9 @@ class OtherTestObj
     x.to_s
   end
 
+  include Send
+end
+
+class OtherTestObj
   include Send # ameba:disable Layout/TrailingBlankLines
 end

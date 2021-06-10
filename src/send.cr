@@ -28,22 +28,24 @@ module Send
     {% end %}
 
     # Constant lookup table for our punctuation conversions.
-    Xtn::SendMethodPunctuationLookups = {
-      /\s*\<\s*/ => "LXESXS",
-      /\s*\=\s*/ => "EXQUALXS",
-      /\s*\!\s*/ => "EXXCLAMATIOXN",
-      /\s*\~\s*/ => "TXILDXE",
-      /\s*\>\s*/ => "GXREATEXR",
-      /\s*\+\s*/ => "PXLUXS",
-      /\s*\-\s*/ => "MXINUXS",
-      /\s*\*\s*/ => "AXSTERISXK",
-      /\s*\/\s*/ => "SXLASXH",
-      /\s*\%\s*/ => "PXERCENXT",
-      /\s*\&\s*/ => "AXMPERSANXD",
-      /\s*\?\s*/ => "QXUESTIOXN",
-      /\s*\[\s*/ => "LXBRACKEXT",
-      /\s*\]\s*/ => "RXBRACKEXT"
-    }
+    {% unless xtn_defined %}
+      Xtn::SendMethodPunctuationLookups = {
+        /\s*\<\s*/ => "LXESXS",
+        /\s*\=\s*/ => "EXQUALXS",
+        /\s*\!\s*/ => "EXXCLAMATIOXN",
+        /\s*\~\s*/ => "TXILDXE",
+        /\s*\>\s*/ => "GXREATEXR",
+        /\s*\+\s*/ => "PXLUXS",
+        /\s*\-\s*/ => "MXINUXS",
+        /\s*\*\s*/ => "AXSTERISXK",
+        /\s*\/\s*/ => "SXLASXH",
+        /\s*\%\s*/ => "PXERCENXT",
+        /\s*\&\s*/ => "AXMPERSANXD",
+        /\s*\?\s*/ => "QXUESTIOXN",
+        /\s*\[\s*/ => "LXBRACKEXT",
+        /\s*\]\s*/ => "RXBRACKEXT"
+      }
+    {% end %}
 
     # This lookup table stores an association of method call signature to method type union, encoded.
     {% if xtn_defined %}
@@ -88,7 +90,18 @@ module Send
     {%
       src = {} of String => Hash(String, String)
       sends = {} of String => Hash(String, Hash(String, String))
-      @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.map { |method| Xtn::SendTypeLookupByLabel[method.args.symbolize] }.uniq.each do |restriction|
+      puts "STATE"
+      pp Xtn::SendTypeLookupByLabel
+      
+      @type.methods.reject do |method|
+        method.args.any? do |arg|
+          arg.restriction.is_a?(Nop)
+        end
+      end.map do |method|
+        Xtn::SendTypeLookupByLabel[method.args.symbolize]
+      end.reject do |method|
+        method.nil?
+      end.uniq.each do |restriction|
         base = restriction.split("__")
 
         # Figuring out all of the type permutations iteratively took some thinking.
