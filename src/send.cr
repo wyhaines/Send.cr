@@ -21,6 +21,12 @@ module Send
 
   # This macros
   macro build_type_lookup_table
+    {% if @type.constant("Xtn") %}
+      {% xtn_defined = true %}
+    {% else %}
+      {% xtn_defined = false %}
+    {% end %}
+
     # Constant lookup table for our punctuation conversions.
     Xtn::SendMethodPunctuationLookups = {
       /\s*\<\s*/ => "LXESXS",
@@ -40,10 +46,15 @@ module Send
     }
 
     # This lookup table stores an association of method call signature to method type union, encoded.
-    Xtn::SendTypeLookupByLabel = {
-    {% for method in @type.methods %}
-      {{method.args.symbolize}} => {{
-                                     method.args.reject do |arg|
+    {% if xtn_defined %}
+      Xtn::SendTypeByLookupLabel.clear.merge(
+    {% else %}
+      Xtn::SendTypeLookupByLabel =
+    {% end %}
+    {
+    {% for args in @type.methods.map(&.args).uniq %}
+      {{args.symbolize}} => {{
+                                     args.reject do |arg|
                                        arg.restriction.is_a?(Nop)
                                      end.map do |arg|
                                        arg.restriction.resolve.union? ? arg.restriction.resolve.union_types.map do |ut|
@@ -52,10 +63,12 @@ module Send
                                      end.join("__")
                                    }},
     {% end %}
-    }
+    }{{ xtn_defined ? ")".id : "".id }}
 
     # This little table stores the arity of all of the methods, allowing this to be queried at runtime.
-    Xtn::SendArity = Hash(String, Array(Range(Int32, Int32))).new {|h, k| h[k] = [] of Range(Int32, Int32)}
+    {% unless xtn_defined %}
+      Xtn::SendArity = Hash(String, Array(Range(Int32, Int32))).new {|h, k| h[k] = [] of Range(Int32, Int32)}
+    {% end %}
     {% for method in @type.methods %}
       {% min = method.args.reject {|m| m.default_value ? true : m.default_value == nil ? true : false}.size %}
       Xtn::SendArity[{{ method.name.stringify }}] << Range.new({{ min }}, {{ method.args.size }})
@@ -63,11 +76,12 @@ module Send
 
     # This lookup table just captures all of the method names, both as *String* and as *Symbol*,
     # allowing runtime lookup of method names by string.
-    Xtn::SendRespondsTo = {
-    {% for method in @type.methods.map(&.name).uniq %}
-      "{{ method }}": true,
+    {% unless xtn_defined %}
+      Xtn::SendRespondsTo = Hash(String, Bool).new
     {% end %}
-    }
+    {% for method in @type.methods.map(&.name).uniq %}
+      Xtn::SendRespondsTo[{{ method.stringify }}] = true
+    {% end %}
   end
 
   macro build_type_lookups
