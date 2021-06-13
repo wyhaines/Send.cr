@@ -94,7 +94,7 @@ describe Send do
   it "can call methods with an equal sign or question mark in their name" do
     test = TestObj.new
 
-    test.send("test=",7)
+    test.send("test=", 7)
     test.send("test").should eq 7
     test.send("test?").should be_true
     test.send("[]", 0).should eq '7'

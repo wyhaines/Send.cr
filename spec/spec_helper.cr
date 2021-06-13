@@ -2,6 +2,8 @@ require "spec"
 require "../src/send"
 
 class TestObj
+  include Send
+
   @test : String | Int::Signed | Int::Unsigned = ""
 
   def nulltest
@@ -56,12 +58,12 @@ class TestObj
   def test?
     @test ? true : false
   end
-
-  include Send
 end
 
 @[SendViaProc]
 class OtherTestObj
+  include Send
+
   def nulltest
     true
   end
@@ -84,6 +86,4 @@ class OtherTestObj
   def complex(x : String | Int32)
     x.to_s
   end
-
-  include Send # ameba:disable Layout/TrailingBlankLines
 end
