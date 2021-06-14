@@ -54,7 +54,7 @@ end
 # Will it work? Of course! Why else would you be reading this?
 #
 # ```
-# 63                          
+# 63
 # ------
 # 14
 # 63
@@ -90,7 +90,7 @@ end
 #
 # That is essentially what this shard does for you. It leverages Crystal's powerful macro system to build code that is similar to the above examples. This, in turn, let's one utilize `#send` to do dynamic method dispatch.
 #
-# And while it might seem like this would slow down that method dispatch, the benchmarks prove otherwise. 
+# And while it might seem like this would slow down that method dispatch, the benchmarks prove otherwise.
 #
 # ```
 # Benchmarks...
