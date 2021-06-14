@@ -51,6 +51,11 @@
   <div class="types-list">
     <ul>
   
+  <li class=" " data-id="send/toplevel" data-name="top level namespace">
+      <a href="toplevel.html">Top Level Namespace</a>
+      
+    </li>
+  
   <li class="parent open current" data-id="send/Send" data-name="send">
       <a href="Send.html">Send</a>
       
@@ -140,6 +145,15 @@
   
   <dl>
     
+      <dt class="entry-const" id="SendMethodPunctuationLookups">
+        <strong>SendMethodPunctuationLookups</strong> = <code>{<span class="t">LXESXS</span>: <span class="s">/\s*\&lt;\s*/</span>, <span class="t">EXQUALXS</span>: <span class="s">/\s*\=\s*/</span>, <span class="t">EXXCLAMATIOXN</span>: <span class="s">/\s*\!\s*/</span>, <span class="t">TXILDXE</span>: <span class="s">/\s*\~\s*/</span>, <span class="t">GXREATEXR</span>: <span class="s">/\s*\&gt;\s*/</span>, <span class="t">PXLUXS</span>: <span class="s">/\s*\+\s*/</span>, <span class="t">MXINUXS</span>: <span class="s">/\s*\-\s*/</span>, <span class="t">AXSTERISXK</span>: <span class="s">/\s*\*\s*/</span>, <span class="t">SXLASXH</span>: <span class="s">/\s*\/\s*/</span>, <span class="t">PXERCENXT</span>: <span class="s">/\s*\%\s*/</span>, <span class="t">AXMPERSANXD</span>: <span class="s">/\s*\&amp;\s*/</span>, <span class="t">QXUESTIOXN</span>: <span class="s">/\s*\?\s*/</span>, <span class="t">LXBRACKEXT</span>: <span class="s">/\s*\[\s*/</span>, <span class="t">RXBRACKEXT</span>: <span class="s">/\s*\]\s*/</span>}</code>
+      </dt>
+      
+      <dd class="entry-const-doc">
+        <p>Constant lookup table for our punctuation conversions.</p>
+      </dd>
+      
+    
       <dt class="entry-const" id="VERSION">
         <strong>VERSION</strong> = <code><span class="s">&quot;0.1.4&quot;</span></code>
       </dt>
@@ -166,33 +180,38 @@
   <ul class="list-summary">
     
       <li class="entry-summary">
-        <a href="#build_callsites-macro" class="signature"><strong>build_callsites</strong></a>
+        <a href="#activate-macro" class="signature"><strong>activate</strong></a>
+        
+      </li>
+    
+      <li class="entry-summary">
+        <a href="#build_callsites(typ)-macro" class="signature"><strong>build_callsites</strong>(typ)</a>
         
           <div class="summary"><p>There are two approaches to providing callsites for invoking methods which are currently provided by this library.</p></div>
         
       </li>
     
       <li class="entry-summary">
-        <a href="#build_lookup_constants-macro" class="signature"><strong>build_lookup_constants</strong></a>
+        <a href="#build_lookup_constants(typ)-macro" class="signature"><strong>build_lookup_constants</strong>(typ)</a>
         
       </li>
     
       <li class="entry-summary">
-        <a href="#build_method_sends-macro" class="signature"><strong>build_method_sends</strong></a>
+        <a href="#build_method_sends(typ)-macro" class="signature"><strong>build_method_sends</strong>(typ)</a>
         
           <div class="summary"><p>Send needs to find the right method to call, in a world where type unions exist and are common.</p></div>
         
       </li>
     
       <li class="entry-summary">
-        <a href="#build_type_lookup_table-macro" class="signature"><strong>build_type_lookup_table</strong></a>
+        <a href="#build_type_lookup_table(typ)-macro" class="signature"><strong>build_type_lookup_table</strong>(typ)</a>
         
           <div class="summary"><p>This macros</p></div>
         
       </li>
     
       <li class="entry-summary">
-        <a href="#build_type_lookups-macro" class="signature"><strong>build_type_lookups</strong></a>
+        <a href="#build_type_lookups(typ)-macro" class="signature"><strong>build_type_lookups</strong>(typ)</a>
         
       </li>
     
@@ -220,12 +239,26 @@
     Macro Detail
   </h2>
   
-    <div class="entry-detail" id="build_callsites-macro">
+    <div class="entry-detail" id="activate-macro">
       <div class="signature">
         
-        macro <strong>build_callsites</strong>
+        macro <strong>activate</strong>
 
-        <a class="method-permalink" href="#build_callsites-macro">#</a>
+        <a class="method-permalink" href="#activate-macro">#</a>
+      </div>
+      
+      <br/>
+      <div>
+        
+      </div>
+    </div>
+  
+    <div class="entry-detail" id="build_callsites(typ)-macro">
+      <div class="signature">
+        
+        macro <strong>build_callsites</strong>(typ)
+
+        <a class="method-permalink" href="#build_callsites(typ)-macro">#</a>
       </div>
       
         <div class="doc">
@@ -257,12 +290,12 @@ callsites.</p>
       </div>
     </div>
   
-    <div class="entry-detail" id="build_lookup_constants-macro">
+    <div class="entry-detail" id="build_lookup_constants(typ)-macro">
       <div class="signature">
         
-        macro <strong>build_lookup_constants</strong>
+        macro <strong>build_lookup_constants</strong>(typ)
 
-        <a class="method-permalink" href="#build_lookup_constants-macro">#</a>
+        <a class="method-permalink" href="#build_lookup_constants(typ)-macro">#</a>
       </div>
       
       <br/>
@@ -271,12 +304,12 @@ callsites.</p>
       </div>
     </div>
   
-    <div class="entry-detail" id="build_method_sends-macro">
+    <div class="entry-detail" id="build_method_sends(typ)-macro">
       <div class="signature">
         
-        macro <strong>build_method_sends</strong>
+        macro <strong>build_method_sends</strong>(typ)
 
-        <a class="method-permalink" href="#build_method_sends-macro">#</a>
+        <a class="method-permalink" href="#build_method_sends(typ)-macro">#</a>
       </div>
       
         <div class="doc">
@@ -299,12 +332,12 @@ method that takes the union type.</p>
       </div>
     </div>
   
-    <div class="entry-detail" id="build_type_lookup_table-macro">
+    <div class="entry-detail" id="build_type_lookup_table(typ)-macro">
       <div class="signature">
         
-        macro <strong>build_type_lookup_table</strong>
+        macro <strong>build_type_lookup_table</strong>(typ)
 
-        <a class="method-permalink" href="#build_type_lookup_table-macro">#</a>
+        <a class="method-permalink" href="#build_type_lookup_table(typ)-macro">#</a>
       </div>
       
         <div class="doc">
@@ -318,12 +351,12 @@ method that takes the union type.</p>
       </div>
     </div>
   
-    <div class="entry-detail" id="build_type_lookups-macro">
+    <div class="entry-detail" id="build_type_lookups(typ)-macro">
       <div class="signature">
         
-        macro <strong>build_type_lookups</strong>
+        macro <strong>build_type_lookups</strong>(typ)
 
-        <a class="method-permalink" href="#build_type_lookups-macro">#</a>
+        <a class="method-permalink" href="#build_type_lookups(typ)-macro">#</a>
       </div>
       
       <br/>
