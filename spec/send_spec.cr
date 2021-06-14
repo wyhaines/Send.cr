@@ -1,5 +1,6 @@
 require "./spec_helper"
 require "big"
+require "benchmark"
 
 describe Send do
   it "can send messages to methods with simple type signatures" do
@@ -94,7 +95,7 @@ describe Send do
   it "can call methods with an equal sign or question mark in their name" do
     test = TestObj.new
 
-    test.send("test=",7)
+    test.send("test=", 7)
     test.send("test").should eq 7
     test.send("test?").should be_true
     test.send("[]", 0).should eq '7'
@@ -113,6 +114,18 @@ describe Send do
 
     test.runtime_responds_to?("test?").should be_true
     test.runtime_responds_to?(:test=).should be_true
+  end
+
+  it "methods defined when a class is reopened, and Send is included a second time, work" do
+    test = OtherTestObj.new
+
+    test.other_method.should eq 999
+  end
+
+  it "methods defined when a class is reopened, and Send is not invoked again, also work" do
+    test = OtherTestObj.new
+
+    test.other_other_method.should eq 2345
   end
 
   if ENV.has_key?("BENCHMARK")

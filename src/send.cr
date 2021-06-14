@@ -1,4 +1,4 @@
-require "benchmark"
+ClassesToEnableSendOn = [] of String
 
 # Classes or methods with this annotation will use a Proc to wrap method calls.
 annotation SendViaProc
@@ -19,62 +19,64 @@ module Send
   # is not mapped.
   class MethodMissing < Exception; end
 
-  # This macros
-  macro build_type_lookup_table
-    # Constant lookup table for our punctuation conversions.
-    Xtn::SendMethodPunctuationLookups = {
-      /\s*\<\s*/ => "LXESXS",
-      /\s*\=\s*/ => "EXQUALXS",
-      /\s*\!\s*/ => "EXXCLAMATIOXN",
-      /\s*\~\s*/ => "TXILDXE",
-      /\s*\>\s*/ => "GXREATEXR",
-      /\s*\+\s*/ => "PXLUXS",
-      /\s*\-\s*/ => "MXINUXS",
-      /\s*\*\s*/ => "AXSTERISXK",
-      /\s*\/\s*/ => "SXLASXH",
-      /\s*\%\s*/ => "PXERCENXT",
-      /\s*\&\s*/ => "AXMPERSANXD",
-      /\s*\?\s*/ => "QXUESTIOXN",
-      /\s*\[\s*/ => "LXBRACKEXT",
-      /\s*\]\s*/ => "RXBRACKEXT"
-    }
+  # Constant lookup table for our punctuation conversions.
+  SendMethodPunctuationLookups = {
+    "LXESXS":        /\s*\<\s*/,
+    "EXQUALXS":      /\s*\=\s*/,
+    "EXXCLAMATIOXN": /\s*\!\s*/,
+    "TXILDXE":       /\s*\~\s*/,
+    "GXREATEXR":     /\s*\>\s*/,
+    "PXLUXS":        /\s*\+\s*/,
+    "MXINUXS":       /\s*\-\s*/,
+    "AXSTERISXK":    /\s*\*\s*/,
+    "SXLASXH":       /\s*\/\s*/,
+    "PXERCENXT":     /\s*\%\s*/,
+    "AXMPERSANXD":   /\s*\&\s*/,
+    "QXUESTIOXN":    /\s*\?\s*/,
+    "LXBRACKEXT":    /\s*\[\s*/,
+    "RXBRACKEXT":    /\s*\]\s*/,
+  }
 
+  # This macros
+  macro build_type_lookup_table(typ)
+    {% type = typ.resolve %}
     # This lookup table stores an association of method call signature to method type union, encoded.
-    Xtn::SendTypeLookupByLabel = {
-    {% for method in @type.methods %}
-      {{method.args.symbolize}} => {{
-                                     method.args.reject do |arg|
-                                       arg.restriction.is_a?(Nop)
-                                     end.map do |arg|
-                                       arg.restriction.resolve.union? ? arg.restriction.resolve.union_types.map do |ut|
-                                         ut.id.gsub(/[)(]/, "").gsub(/ \| /, "_")
-                                       end.join("_") : arg.restriction.id.gsub(/ \| /, "_").id
-                                     end.join("__")
-                                   }},
+    {{ type }}::Xtn::SendTypeLookupByLabel = {
+    {% for args in type.methods.map(&.args).uniq %}
+      {{args.stringify}}: {{
+                                   args.reject do |arg|
+                                     arg.restriction.is_a?(Nop)
+                                   end.map do |arg|
+                                     arg.restriction.resolve.union? ? arg.restriction.resolve.union_types.map do |ut|
+                                       ut.id.gsub(/[)(]/, "").gsub(/ \| /, "_")
+                                     end.join("_") : arg.restriction.id.gsub(/ \| /, "_").id
+                                   end.join("__")
+                                 }},
     {% end %}
     }
 
     # This little table stores the arity of all of the methods, allowing this to be queried at runtime.
-    Xtn::SendArity = Hash(String, Array(Range(Int32, Int32))).new {|h, k| h[k] = [] of Range(Int32, Int32)}
-    {% for method in @type.methods %}
-      {% min = method.args.reject {|m| m.default_value ? true : m.default_value == nil ? true : false}.size %}
-      Xtn::SendArity[{{ method.name.stringify }}] << Range.new({{ min }}, {{ method.args.size }})
+    {{ type }}::Xtn::SendArity = Hash(String, Array(Range(Int32, Int32))).new {|h, k| h[k] = [] of Range(Int32, Int32)}
+    {% for method in type.methods %}
+      {% min = method.args.reject { |m| m.default_value ? true : m.default_value == nil ? true : false }.size %}
+      {{ type }}::Xtn::SendArity[{{ method.name.stringify }}] << Range.new({{ min }}, {{ method.args.size }})
     {% end %}
 
     # This lookup table just captures all of the method names, both as *String* and as *Symbol*,
     # allowing runtime lookup of method names by string.
-    Xtn::SendRespondsTo = {
-    {% for method in @type.methods.map(&.name).uniq %}
+    {{ type }}::Xtn::SendRespondsTo = {
+    {% for method in type.methods.map(&.name).uniq %}
       "{{ method }}": true,
     {% end %}
     }
   end
 
-  macro build_type_lookups
+  macro build_type_lookups(typ)
     {%
+      type = typ.resolve
       src = {} of String => Hash(String, String)
       sends = {} of String => Hash(String, Hash(String, String))
-      @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.map { |method| Xtn::SendTypeLookupByLabel[method.args.symbolize] }.uniq.each do |restriction|
+      type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.map { |method| type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize] }.uniq.each do |restriction|
         base = restriction.split("__")
 
         # Figuring out all of the type permutations iteratively took some thinking.
@@ -92,9 +94,9 @@ module Send
           repeats = permutations / (progression * blen)
           step = 0
           (1..repeats).each do |repeat|
-            b.split("_").each do |type|
+            b.split("_").each do |type_|
               (1..progression).each do |prog|
-                combos[step] << type
+                combos[step] << type_
                 step += 1
               end
             end
@@ -104,9 +106,9 @@ module Send
 
         combos.each do |combo|
           combo_string = combo.join("__").id
-          constant_name = "Xtn::SendLookup___#{combo.map { |c| c.gsub(/[\(\)]/,"PXAREXN").gsub(/::/, "CXOLOXN") }.join("__").id}" # ameba:disable Style/VerboseBlock
-          @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.each do |method|
-            if restriction == Xtn::SendTypeLookupByLabel[method.args.symbolize]
+          constant_name = "#{type}::Xtn::SendLookup___#{combo.map { |c| c.gsub(/[\(\)]/, "PXAREXN").gsub(/::/, "CXOLOXN") }.join("__").id}" # ameba:disable Style/VerboseBlock
+          type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.each do |method|
+            if restriction == type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize]
               if !method.annotations(SendViaProc).empty?
                 use_procs = "Y:"
               elsif !method.annotations(SendViaRecord).empty?
@@ -126,23 +128,24 @@ module Send
                 "use_procs" => use_procs,
               }
               method_name = method.name
-              Xtn::SendMethodPunctuationLookups.each do |punct, name|
-                method_name = method_name.gsub(punct, name)
+              ::Send::SendMethodPunctuationLookups.each do |name, punct|
+                method_name = method_name.gsub(punct, name.stringify)
               end
-              src[constant_name][method.name.stringify] = "Xtn::Send_#{method_name}_#{restriction.gsub(/::/, "CXOLOXN").id}"
+              src[constant_name][method.name.stringify] = "#{type}::Xtn::Send_#{method_name}_#{restriction.gsub(/::/, "CXOLOXN").id}"
             end
           end
         end
       end
     %}
-    Xtn::SendRawCombos = {{src.stringify.id}}
-    Xtn::SendParameters = {{sends.stringify.id}}
+    {{ type }}::Xtn::SendRawCombos = {{src.stringify.id}}
+    {{ type }}::Xtn::SendParameters = {{sends.stringify.id}}
   end
 
-  macro build_lookup_constants
-    {% combo_keys = Xtn::SendRawCombos.keys %}
+  macro build_lookup_constants(typ)
+    {% type = typ.resolve %}
+    {% combo_keys = type.constant(:Xtn).constant(:SendRawCombos).keys %}
     {% for constant_name in combo_keys %}
-    {% hsh = Xtn::SendRawCombos[constant_name] %}
+    {% hsh = type.constant(:Xtn).constant(:SendRawCombos)[constant_name] %}
     {{ constant_name.id }} = {
       {% for method_name, callsite in hsh %}{{method_name}}: {{callsite.id}},
       {% end %}}{% end %}
@@ -167,24 +170,25 @@ module Send
   # used on an instance variable, which record-type callsites use. However,
   # dynamic dispatch using Proc-type callsites is slower than with record-type
   # callsites.
-  macro build_callsites
-    {% use_procs = !@type.annotations(SendViaProc).empty? %}
-    {% for method in @type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } } %}
+  macro build_callsites(typ)
+    {% type = typ.resolve %}
+    {% use_procs = !type.annotations(SendViaProc).empty? %}
+    {% for method in type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } } %}
       {%
         method_args = method.args
         method_name = method.name
 
         safe_method_name = method_name
-        Xtn::SendMethodPunctuationLookups.each do |punct, name|
-          safe_method_name = safe_method_name.gsub(punct, name)
+        ::Send::SendMethodPunctuationLookups.each do |name, punct|
+          safe_method_name = safe_method_name.gsub(punct, name.stringify)
         end
       %}
       {% if use_procs == true %}
-        Xtn::Send_{{ safe_method_name }}_{{ Xtn::SendTypeLookupByLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }} = ->(obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
+        {{ type }}::Xtn::Send_{{ safe_method_name }}_{{ type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize].gsub(/::/, "CXOLOXN").id }} = ->(obj : {{ type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
           obj.{{ method_name }}({{ method_args.map(&.name).join(", ").id }})
         end
       {% else %}
-        record Xtn::Send_{{ safe_method_name }}_{{ Xtn::SendTypeLookupByLabel[method.args.symbolize].gsub(/::/, "CXOLOXN").id }}, obj : {{ @type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
+        record {{ type }}::Xtn::Send_{{ safe_method_name }}_{{ type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize].gsub(/::/, "CXOLOXN").id }}, obj : {{ type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
           def call
             obj.{{ method_name }}({{ method_args.map(&.name).join(", ").id }})
           end
@@ -203,9 +207,13 @@ module Send
   # work as expected. However, if you try to send to the method that takes the union, using an
   # Int32, the `send` that takes Int32 will be called, and it needs to be able to find the
   # method that takes the union type.
-  macro build_method_sends
-    {% class_use_procs = !@type.annotations(SendViaProc).empty? %}
-    {% for constant, hsh in Xtn::SendParameters %}
+  macro build_method_sends(typ)
+    {%
+      type = typ.resolve
+      class_use_procs = !type.annotations(SendViaProc).empty?
+      send_parameters = type.constant(:Xtn).constant(:SendParameters)
+    %}
+    {% for constant, hsh in send_parameters %}
     {% for signature, argn in hsh %}
     {%
       args = argn["args"]
@@ -219,6 +227,7 @@ module Send
       end
     %}
 
+    {{ type.class? ? "class".id : type.struct? ? "struct".id : "module" }} {{ type }}
     def __send__(method : String, {{ signature.id }})
       begin
       {% if use_procs == true %}
@@ -265,16 +274,13 @@ module Send
       __send__?(method, *honeypot_args)
     end
 
+    end
     {% end %}
     {% end %}
   end
 
   macro included
-    build_type_lookup_table
-    build_type_lookups
-    build_lookup_constants
-    build_callsites
-    build_method_sends
+    {% ClassesToEnableSendOn << @type.name %}
 
     # The standard #responds_to? only takes a symbol, and Crystal doesn't permit
     # String => Symbol, so if one wants to determine if a method exists, where the
@@ -283,12 +289,22 @@ module Send
     #
     # `runtime_responds_to?` should, effectively, work just like the builtin method,
     # but it can handle strings as well as symbols.
-    def runtime_responds_to?(method : String | Symbol)
-      Xtn::SendRespondsTo[method.to_s.tr(":","")]? || false
+    def runtime_responds_to?(_method : String | Symbol)
+      {{ @type }}::Xtn::SendRespondsTo[_method.to_s.tr(":","")]? || false
     end
 
-    def arity(method : String | Symbol)
-      Xtn::SendArity[method.to_s.tr(":","")]? || [(..)]
+    def arity(_method : String | Symbol)
+      {{ @type }}::Xtn::SendArity[_method.to_s.tr(":","")]? || [(..)]
     end
+  end
+
+  macro extended
+    {% for klass in ClassesToEnableSendOn.uniq %}
+      build_type_lookup_table({{klass.id}})
+      build_type_lookups({{klass.id}})
+      build_lookup_constants({{klass.id}})
+      build_callsites({{klass.id}})
+      build_method_sends({{klass.id}})
+    {% end %}
   end
 end

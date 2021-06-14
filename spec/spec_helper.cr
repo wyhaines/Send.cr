@@ -2,6 +2,8 @@ require "spec"
 require "../src/send"
 
 class TestObj
+  include Send
+
   @test : String | Int::Signed | Int::Unsigned = ""
 
   def nulltest
@@ -56,19 +58,17 @@ class TestObj
   def test?
     @test ? true : false
   end
-
-  include Send
 end
 
 @[SendViaProc]
 class OtherTestObj
+  include Send
+
   def nulltest
     true
   end
 
-  alias Num = Int::Signed | Int::Unsigned | Float::Primitive
-
-  def num_or_string_to_bigint(val : String | Num)
+  def num_or_string_to_bigint(val : String | Int::Signed | Int::Unsigned | Float::Primitive)
     BigInt.new(val.is_a?(Float) ? val.to_i128 : val.to_s)
   end
 
@@ -84,6 +84,21 @@ class OtherTestObj
   def complex(x : String | Int32)
     x.to_s
   end
-
-  include Send # ameba:disable Layout/TrailingBlankLines
 end
+
+# Test whether we can reopen a class without breaking anything.
+class OtherTestObj
+  include Send
+
+  def other_method
+    999
+  end
+end
+
+class OtherTestObj
+  def other_other_method
+    2345
+  end
+end
+
+extend Send
