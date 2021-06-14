@@ -1,4 +1,4 @@
-ClassesToEnableSendOn = [] of String
+ClassesToEnable = [] of String
 
 # Classes or methods with this annotation will use a Proc to wrap method calls.
 annotation SendViaProc
@@ -12,12 +12,211 @@ end
 annotation SendSkip
 end
 
+# Crystal looks and feels a lot like Ruby. However, pieces of the metaprogramming toolkits between the two languages are very different. The high level difference is that Ruby makes extensive use of facilities like `eval`, `method_missing`, and `send` to do its dynamic magic. And while Crystal does support `method_missing`, because of its compiled nature, most of Crystal's dynamic magic comes from the use of macros. Crystal does not support `eval` or  `send`.
+#
+# However...
+#
+# Consider this program:
+#
+# ```crystal
+# require "secret_sauce"
+#
+# class Foo
+#   include Send
+#
+#   def a(val : Int32)
+#     val + 7
+#   end
+#
+#   def b(x : Int32, y : Int32)
+#     x * y
+#   end
+#
+#   def c(val : Int32, val2 : Int32)
+#     val * val2
+#   end
+#
+#   def d(xx : String, yy : Int32) : UInt128
+#     xx.to_i.to_u128 ** yy
+#   end
+# end
+#
+# Send.activate
+#
+# f = Foo.new
+# puts f.b(7, 9)
+# puts "------"
+# puts f.send("a", 7)
+# puts f.send("b", 7, 9)
+# puts f.send("d", "2", 64)
+# ```
+#
+# Will it work? Of course! Why else would you be reading this?
+#
+# ```
+# 63                          
+# ------
+# 14
+# 63
+# 18446744073709551616
+# ```
+#
+# In this example, SecretSauce is a proof of concept implementation:
+#
+# ```crystal
+# module SecretSauce
+#   SendLookupInt32 = {
+#     "a": ->(obj : Foo, val : Int32) { obj.a(val) },
+#   }
+#
+#   SendLookupInt32Int32 = {
+#     "b": ->(obj : Foo, x : Int32, y : Int32) { obj.b(x, y) },
+#     "c": ->(obj : Foo, val : Int32, val2 : Int32) { obj.c(val, val2) },
+#   }
+#
+#   def send(method, arg1 : Int32)
+#     SendLookupInt32[method].call(self, arg1)
+#   end
+#
+#   def send(method, arg1 : Int32, arg2 : Int32)
+#     SendLookupInt32Int32[method].call(self, arg1, arg2)
+#   end
+# end
+# ```
+#
+# It works by creating a set of lookup tables that match method names to their argument type signature set.
+#
+# When paired with overloaded `#send` methods, one per argument type signature set, it is a fairly simple matter to lookup the method name, and to call the proc with the matching arguments.
+#
+# That is essentially what this shard does for you. It leverages Crystal's powerful macro system to build code that is similar to the above examples. This, in turn, let's one utilize `#send` to do dynamic method dispatch.
+#
+# And while it might seem like this would slow down that method dispatch, the benchmarks prove otherwise. 
+#
+# ```
+# Benchmarks...
+#   direct method invocation -- nulltest 771.44M (  1.30ns) (± 1.67%)  0.0B/op        fastest
+# send via record callsites -- nulltest 768.43M (  1.30ns) (± 2.71%)  0.0B/op   1.00x slower
+#   send via proc callsites -- nulltest 367.63M (  2.72ns) (± 1.25%)  0.0B/op   2.52x slower
+#   direct method invocation 386.46M (  2.59ns) (± 1.17%)  0.0B/op        fastest
+# send via record callsites 384.89M (  2.60ns) (± 3.20%)  0.0B/op   1.00x slower
+#   send via proc callsites 220.40M (  4.54ns) (± 1.57%)  0.0B/op   1.75x slowerr
+#
+# ```
+#
+# For all intents and purposes, when running code build with `--release`, the execution speed between the direct calls and the `#send` based calls is the same, when using *record* type callsites. It is somewhat slower when using *proc* type callsites, but the performance is still reasonably good.
+#
+# ## Limitations
+#
+# This approach currently has some significant limitations.
+#
+# ### Methods can't be sent to if they do not have type definitions
+#
+# First, it will not work automatically on any method which does not have a type definition. Crystal must expand macros into code before type inference runs, so arguments with no provided method types lack the information needed to build the callsites.
+#
+# This is because both of the techniques used to provide callsites, the use of *Proc* or the use of a *record*, require this type information. Proc arguments must have types, and will return a `Error: function argument ZZZ must have a type` if one is not provided. The *record* macro, on the other hand, builds instance variables for the arguments, which, again, require types to be provided at the time of declaration.
+#
+# A possible partial remediation that would allow one to retrofit the ability to use `send` with methods that aren't already defined with fully typing would be to enable the use of annotations to describe the type signature for the method. This would allow someone to reopen a class, attach type signatures to the methods that need them, and then include `Send` in the class to enable sending to those methods.
+#
+# ### Methods that take blocks are currently unsupported
+#
+# This can be supported. The code to do it is still just TODO.
+#
+# ### Named argument support is flakey
+#
+# Consider two method definitions:
+#
+# ```crystal
+# def a(b : Int32)
+#   puts "b is #{b}"
+# end
+#
+# def a(c : Int32)
+#   puts "c is #{c}"
+# end
+# ```
+#
+# Only the last one defined, `a(c : Int32)`, will exist in the compiled code. So if you have different methods with the same type signatures, only the last one defined can be addressed using named arguments.
+#
+# TODO is to see if there is a way to leverage splats and double splats in the send implementation so that all argument handling just works the way that one would expect.
+#
+# ## Installation
+#
+# 1. Add the dependency to your `shard.yml`:
+#
+#     ```yaml
+#     dependencies:
+#       send:
+#         github: your-github-user/send
+#     ```
+#
+# 2. Run `shards install`
+#
+# ## Usage
+#
+# ```crystal
+# require "send"
+#
+# class Foo
+#   include Send
+#   def abc(n : Int32)
+#     n * 123
+#   end
+# end
+#
+# Send.activate
+# ```
+#
+# When `Send` is included into a class, it registers the class with the Send module, but does no other initialization. To complete initialization, insert a `Send.activate` after all method definitions on the class or struct have been completed. This will setup callsites for all methods that have been defined before that point, which have type definitions on their arguments. By default, this uses *record* callsites for everything. When compiled with `--release`, using *record* callsites is as fast as directly calling the method. If a method uses types that can not be used with an instance variable, but are otherwise legal method types, the *Proc* callsite type can be used instead.
+#
+# To specify that the entire class should use one callsite type or another, use an annotation on the class.
+#
+# ```crystal
+# @[SendViaProc]
+# class Foo
+# end
+# ```
+#
+# The `@[SendViaRecord]` annotation is also supported, but since that is the default, one should not need to use it at the class level.
+#
+# These same annotations can also be used on methods to specify the `send` behavior for a given method.
+#
+# ```crystal
+# @[SendViaProc]
+# class Foo
+#   def abc(n : Int32)
+#     n ** n
+#   end
+#
+#   @[SendViaRecord]
+#   def onetwothree(x : Int::Signed | Int::Unsigned, y : Int::Signed | Int::Unsigned)
+#     BigInt.new(x) ** BigInt.new(y)
+#   end
+# end
+# ```
+#
+# The `@[SendSkip]` annotation can be used to indicate that a specific method should be skipped when building callsites for *#send*.
+#
+# ```crystal
+# class Foo
+#   def abc(n : Int32)
+#     n ** n
+#   end
+#
+#   @[SendSkip]
+#   def def(x)
+#     yield x
+#   end
+# end
+# ```
+
 module Send
   VERSION = "0.1.4"
 
   # This excption will be raised if 'send' is invoked for a method that
   # is not mapped.
   class MethodMissing < Exception; end
+
+  private Activated = [false]
 
   # Constant lookup table for our punctuation conversions.
   SendMethodPunctuationLookups = {
@@ -108,10 +307,10 @@ module Send
           combo_string = combo.join("__").id
           constant_name = "#{type}::Xtn::SendLookup___#{combo.map { |c| c.gsub(/[\(\)]/, "PXAREXN").gsub(/::/, "CXOLOXN") }.join("__").id}" # ameba:disable Style/VerboseBlock
           type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.each do |method|
-            if restriction == type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize]
-              if !method.annotations(SendViaProc).empty?
+            if !method.annotation(SendSkip) && restriction == type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize]
+              if method.annotation(SendViaProc)
                 use_procs = "Y:"
-              elsif !method.annotations(SendViaRecord).empty?
+              elsif method.annotation(SendViaRecord)
                 use_procs = "N:"
               else
                 use_procs = ":"
@@ -239,8 +438,14 @@ module Send
         raise MethodMissing.new("Can not send to '#{method}'; check that it exists and all arguments have type specifications.")
       end
     end
+    def __send__(method : Symbol, {{ signature.id }})
+      __send__(method.to_s, {{ args.id }})
+    end
     def send(method : String, {{ signature.id }})
       __send__(method, {{ args.id }})
+    end
+    def send(method : Symbol, {{ signature.id }})
+      __send__(method.to_s, {{ args.id }})
     end
 
     def __send__?(method : String, {{ signature.id }})
@@ -255,7 +460,13 @@ module Send
       end
     end
     def send?(method : String, {{ signature.id }})
+    __send__(method, {{ args.id }})
+    end
+    def send?(method : String, {{ signature.id }})
       __send__?(method, {{ args.id }})
+    end
+    def send?(method : Symbol, {{ signature.id }})
+    __send__(method.to_s, {{ args.id }})
     end
 
     # This incarnation of `#__send__` is a honeypot, to capture method invocations
@@ -280,7 +491,7 @@ module Send
   end
 
   macro included
-    {% ClassesToEnableSendOn << @type.name %}
+    {% ClassesToEnable << @type.name %}
 
     # The standard #responds_to? only takes a symbol, and Crystal doesn't permit
     # String => Symbol, so if one wants to determine if a method exists, where the
@@ -298,13 +509,18 @@ module Send
     end
   end
 
-  macro extended
-    {% for klass in ClassesToEnableSendOn.uniq %}
-      build_type_lookup_table({{klass.id}})
-      build_type_lookups({{klass.id}})
-      build_lookup_constants({{klass.id}})
-      build_callsites({{klass.id}})
-      build_method_sends({{klass.id}})
+  macro activate
+    {% if Activated.first %}
+      raise "Error. Send.activate() can only be called a single time. Please ensure that activation can not happen multiple times."
+    {% else %}
+      {% Activated[0] = true %}
+      {% for klass in ClassesToEnable.uniq %}
+        Send.build_type_lookup_table({{klass.id}})
+        Send.build_type_lookups({{klass.id}})
+        Send.build_lookup_constants({{klass.id}})
+        Send.build_callsites({{klass.id}})
+        Send.build_method_sends({{klass.id}})
+      {% end %}
     {% end %}
   end
 end

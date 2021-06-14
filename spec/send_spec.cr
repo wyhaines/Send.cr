@@ -128,6 +128,29 @@ describe Send do
     test.other_other_method.should eq 2345
   end
 
+  it "raises an exception of one attempts to activate the send methods twice" do
+    e = nil
+    begin
+      Send.activate
+    rescue e : Exception
+    end
+
+    e.should_not be_nil
+  end
+
+  it "can skip methods which are marked with the @[SendSkip] annotation" do
+    test = TestObj.new
+
+    test.skip_this_one.should be_true
+    e = nil
+    begin
+      test.send(:skip_this_one)
+    rescue e : Exception
+    end
+
+    e.is_a?(Send::MethodMissing).should be_true
+  end
+
   if ENV.has_key?("BENCHMARK")
     it "runs benchmarks" do
       puts "\n\nBenchmarks..."

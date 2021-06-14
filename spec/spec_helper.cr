@@ -58,6 +58,11 @@ class TestObj
   def test?
     @test ? true : false
   end
+
+  @[SendSkip]
+  def skip_this_one
+    true
+  end
 end
 
 @[SendViaProc]
@@ -101,4 +106,4 @@ class OtherTestObj
   end
 end
 
-extend Send
+Send.activate
