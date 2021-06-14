@@ -14,6 +14,8 @@ Consider this program:
 require "secret_sauce"
 
 class Foo
+  include Send
+
   def a(val : Int32)
     val + 7
   end
@@ -29,9 +31,9 @@ class Foo
   def d(xx : String, yy : Int32) : UInt128
     xx.to_i.to_u128 ** yy
   end
-
-  include SecretSauce
 end
+
+Send.activate
 
 f = Foo.new
 puts f.b(7, 9)
@@ -84,8 +86,8 @@ And while it might seem like this would slow down that method dispatch, the benc
 
 ```
 Benchmarks...
- direct method invocation -- nulltest 927.30M (  1.08ns) (± 1.20%)  0.0B/op        fastest
-send via record callsites -- nulltest 926.22M (  1.08ns) (± 1.85%)  0.0B/op   1.00x slower
+ direct method invocation -- nulltest 771.44M (  1.30ns) (± 1.67%)  0.0B/op        fastest
+send via record callsites -- nulltest 768.43M (  1.30ns) (± 2.71%)  0.0B/op   1.00x slower
   send via proc callsites -- nulltest 367.63M (  2.72ns) (± 1.25%)  0.0B/op   2.52x slower
  direct method invocation 386.46M (  2.59ns) (± 1.17%)  0.0B/op        fastest
 send via record callsites 384.89M (  2.60ns) (± 3.20%)  0.0B/op   1.00x slower
@@ -143,23 +145,24 @@ TODO is to see if there is a way to leverage splats and double splats in the sen
 
 ## Usage
 
-```
+```crystal
 require "send"
 
 class Foo
+  include Send
   def abc(n : Int32)
     n * 123
   end
-
-  include Send
 end
+
+Send.activate
 ```
 
-When `Send` is included into a class, it will setup callsites for all methods that have been defined before that point, which have type definitions on their arguments. By default, this uses *record* callsites for everything. When compiled with `--release`, using *record* callsites is as fast as directly calling the method. If a method uses types that can not be used with an instance variable, but are otherwise legal method types, the *Proc* callsite type can be used instead.
+When `Send` is included into a class, it registers the class with the Send module, but does no other initialization. To complete initialization, insert a `Send.activate` after all method definitions on the class or struct have been completed. This will setup callsites for all methods that have been defined before that point, which have type definitions on their arguments. By default, this uses *record* callsites for everything. When compiled with `--release`, using *record* callsites is as fast as directly calling the method. If a method uses types that can not be used with an instance variable, but are otherwise legal method types, the *Proc* callsite type can be used instead.
 
 To specify that the entire class should use one callsite type or another, use an annotation on the class.
 
-```
+```crystal
 @[SendViaProc]
 class Foo
 end
@@ -169,7 +172,7 @@ The `@[SendViaRecord]` annotation is also supported, but since that is the defau
 
 These same annotations can also be used on methods to specify the `send` behavior for a given method.
 
-```
+```crystal
 @[SendViaProc]
 class Foo
   def abc(n : Int32)
@@ -183,7 +186,20 @@ class Foo
 end
 ```
 
-The 
+The `@[SendSkip]` annotation can be used to indicate that a specific method should be skipped when building callsites for *#send*.
+
+```crystal
+class Foo
+  def abc(n : Int32)
+    n ** n
+  end
+
+  @[SendSkip]
+  def def(x)
+    yield x
+  end
+end
+```
 
 ## Development
 
