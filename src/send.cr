@@ -210,7 +210,7 @@ end
 # ```
 
 module Send
-  VERSION = "0.1.4"
+  VERSION = "2.0.0"
 
   # This excption will be raised if 'send' is invoked for a method that
   # is not mapped.
