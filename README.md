@@ -11,7 +11,7 @@ However...
 Consider this program:
 
 ```crystal
-require "secret_sauce"
+require "send"
 
 class Foo
   include Send
@@ -138,7 +138,7 @@ TODO is to see if there is a way to leverage splats and double splats in the sen
    ```yaml
    dependencies:
      send:
-       github: your-github-user/send
+       github: wyhaines/send.cr
    ```
 
 2. Run `shards install`
