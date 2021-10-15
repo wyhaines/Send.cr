@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<meta name="generator" content="Crystal Docs 1.0.0">
+<meta name="generator" content="Crystal Docs 1.1.1">
 <meta name="crystal_docs.project_version" content="main">
 <meta name="crystal_docs.project_name" content="send">
 
@@ -187,33 +187,33 @@
       </li>
     
       <li class="entry-summary">
-        <a href="#build_callsites(typ)-macro" class="signature"><strong>build_callsites</strong>(typ)</a>
+        <a href="#build_callsites%28typ%29-macro" class="signature"><strong>build_callsites</strong>(typ)</a>
         
           <div class="summary"><p>There are two approaches to providing callsites for invoking methods which are currently provided by this library.</p></div>
         
       </li>
     
       <li class="entry-summary">
-        <a href="#build_lookup_constants(typ)-macro" class="signature"><strong>build_lookup_constants</strong>(typ)</a>
+        <a href="#build_lookup_constants%28typ%29-macro" class="signature"><strong>build_lookup_constants</strong>(typ)</a>
         
       </li>
     
       <li class="entry-summary">
-        <a href="#build_method_sends(typ)-macro" class="signature"><strong>build_method_sends</strong>(typ)</a>
+        <a href="#build_method_sends%28typ%29-macro" class="signature"><strong>build_method_sends</strong>(typ)</a>
         
           <div class="summary"><p>Send needs to find the right method to call, in a world where type unions exist and are common.</p></div>
         
       </li>
     
       <li class="entry-summary">
-        <a href="#build_type_lookup_table(typ)-macro" class="signature"><strong>build_type_lookup_table</strong>(typ)</a>
+        <a href="#build_type_lookup_table%28typ%29-macro" class="signature"><strong>build_type_lookup_table</strong>(typ)</a>
         
           <div class="summary"><p>This macros</p></div>
         
       </li>
     
       <li class="entry-summary">
-        <a href="#build_type_lookups(typ)-macro" class="signature"><strong>build_type_lookups</strong>(typ)</a>
+        <a href="#build_type_lookups%28typ%29-macro" class="signature"><strong>build_type_lookups</strong>(typ)</a>
         
       </li>
     
@@ -262,7 +262,7 @@
         
         macro <strong>build_callsites</strong>(typ)
 
-        <a class="method-permalink" href="#build_callsites(typ)-macro">#</a>
+        <a class="method-permalink" href="#build_callsites%28typ%29-macro">#</a>
       </div>
       
         <div class="doc">
@@ -275,7 +275,6 @@ create a set of <code>record</code>s which take the same argument set as the met
 that it maps to. A <code>call</code> method exists on the record, and when invoked,
 it calls the method using the arguments that were used to create the
 record.</p>
-
 <p>This macro builds the callsites to send methods to. It defaults to using
 record structs to implement the callsites, but if passed a <code>true</code> when the
 macro is invoked, it will build the callsite using a Proc instead. Callsites
@@ -301,7 +300,7 @@ callsites.</p>
         
         macro <strong>build_lookup_constants</strong>(typ)
 
-        <a class="method-permalink" href="#build_lookup_constants(typ)-macro">#</a>
+        <a class="method-permalink" href="#build_lookup_constants%28typ%29-macro">#</a>
       </div>
       
       <br/>
@@ -317,7 +316,7 @@ callsites.</p>
         
         macro <strong>build_method_sends</strong>(typ)
 
-        <a class="method-permalink" href="#build_method_sends(typ)-macro">#</a>
+        <a class="method-permalink" href="#build_method_sends%28typ%29-macro">#</a>
       </div>
       
         <div class="doc">
@@ -325,7 +324,6 @@ callsites.</p>
           <p>Send needs to find the right method to call, in a world where type unions exist and are
 common. This may not be the right approach, but it is an approach, and it what I am starting
 with.</p>
-
 <p>The basic problem is that if, say, you have a method that takes a <code>String | Int32</code>, and you
 also have a method that takes only an <code>Int32</code>, you will end up with two overloaded <code>send</code>
 methods. If you try to send to the method that takes the union, using a <code>String</code>, it will
@@ -347,7 +345,7 @@ method that takes the union type.</p>
         
         macro <strong>build_type_lookup_table</strong>(typ)
 
-        <a class="method-permalink" href="#build_type_lookup_table(typ)-macro">#</a>
+        <a class="method-permalink" href="#build_type_lookup_table%28typ%29-macro">#</a>
       </div>
       
         <div class="doc">
@@ -368,7 +366,7 @@ method that takes the union type.</p>
         
         macro <strong>build_type_lookups</strong>(typ)
 
-        <a class="method-permalink" href="#build_type_lookups(typ)-macro">#</a>
+        <a class="method-permalink" href="#build_type_lookups%28typ%29-macro">#</a>
       </div>
       
       <br/>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<meta name="generator" content="Crystal Docs 1.0.0">
+<meta name="generator" content="Crystal Docs 1.1.1">
 <meta name="crystal_docs.project_version" content="main">
 <meta name="crystal_docs.project_name" content="send">
 
@@ -93,22 +93,16 @@
 
 
 <div class="main-content">
-<h1><a id="send" class="anchor" href="#send">
-  <svg class="octicon-link" aria-hidden="true">
+<h1><a id="send" class="anchor" href="#send">  <svg class="octicon-link" aria-hidden="true">
     <use href="#octicon-link"/>
   </svg>
 </a>send</h1>
-
-<p><img src="https://img.shields.io/github/workflow/status/wyhaines/Send.cr/Send.cr%20CI?style=for-the-badge&logo=GitHub" alt="Send.cr CI"/>
-<a href="https://github.com/wyhaines/Send.cr/releases"><img src="https://img.shields.io/github/release/wyhaines/Send.cr.svg?style=for-the-badge" alt="GitHub release"/></a>
-<img src="https://img.shields.io/github/commits-since/wyhaines/Send.cr/latest?style=for-the-badge" alt="GitHub commits since latest release (by SemVer)"/></p>
-
+<p><img src="https://img.shields.io/github/workflow/status/wyhaines/Send.cr/Send.cr%20CI?style=for-the-badge&amp;logo=GitHub" alt="Send.cr CI" />
+<a href="https://github.com/wyhaines/Send.cr/releases"><img src="https://img.shields.io/github/release/wyhaines/Send.cr.svg?style=for-the-badge" alt="GitHub release" /></a>
+<img src="https://img.shields.io/github/commits-since/wyhaines/Send.cr/latest?style=for-the-badge" alt="GitHub commits since latest release (by SemVer)" /></p>
 <p>Crystal looks and feels a lot like Ruby. However, pieces of the metaprogramming toolkits between the two languages are very different. The high level difference is that Ruby makes extensive use of facilities like <code>eval</code>, <code>method_missing</code>, and <code>send</code> to do its dynamic magic. And while Crystal does support <code>method_missing</code>, because of its compiled nature, most of Crystal's dynamic magic comes from the use of macros. Crystal does not support <code>eval</code> or  <code>send</code>.</p>
-
 <p>However...</p>
-
 <p>Consider this program:</p>
-
 <pre><code class="language-crystal"><span class="k">require</span> <span class="s">&quot;send&quot;</span>
 
 <span class="k">class</span> <span class="t">Foo</span>
@@ -139,17 +133,13 @@ puts <span class="s">&quot;------&quot;</span>
 puts f.send(<span class="s">&quot;a&quot;</span>, <span class="n">7</span>)
 puts f.send(<span class="s">&quot;b&quot;</span>, <span class="n">7</span>, <span class="n">9</span>)
 puts f.send(<span class="s">&quot;d&quot;</span>, <span class="s">&quot;2&quot;</span>, <span class="n">64</span>)</code></pre>
-
 <p>Will it work? Of course! Why else would you be reading this?</p>
-
 <pre><code class="language-crystal">63                          
 ------
 14
 63
 18446744073709551616</code></pre>
-
 <p>In this example, SecretSauce is a proof of concept implementation:</p>
-
 <pre><code class="language-crystal"><span class="k">module</span> <span class="t">SecretSauce</span>
   <span class="t">SendLookupInt32</span> <span class="o">=</span> {
     <span class="s">&quot;a&quot;</span>: ->(obj : <span class="t">Foo</span>, val : <span class="t">Int32</span>) { obj.a(val) },
@@ -168,15 +158,10 @@ puts f.send(<span class="s">&quot;d&quot;</span>, <span class="s">&quot;2&quot;<
     <span class="t">SendLookupInt32Int32</span>[method].call(<span class="k">self</span>, arg1, arg2)
   <span class="k">end</span>
 <span class="k">end</span></code></pre>
-
 <p>It works by creating a set of lookup tables that match method names to their argument type signature set.</p>
-
 <p>When paired with overloaded <code>#send</code> methods, one per argument type signature set, it is a fairly simple matter to lookup the method name, and to call the proc with the matching arguments.</p>
-
 <p>That is essentially what this shard does for you. It leverages Crystal's powerful macro system to build code that is similar to the above examples. This, in turn, let's one utilize <code>#send</code> to do dynamic method dispatch.</p>
-
-<p>And while it might seem like this would slow down that method dispatch, the benchmarks prove otherwise. </p>
-
+<p>And while it might seem like this would slow down that method dispatch, the benchmarks prove otherwise.</p>
 <pre><code class="language-crystal">Benchmarks...
  direct method invocation -- nulltest 771.44M (  1.30ns) (± 1.67%)  0.0B/op        fastest
 send via record callsites -- nulltest 768.43M (  1.30ns) (± 2.71%)  0.0B/op   1.00x slower
@@ -185,45 +170,33 @@ send via record callsites -- nulltest 768.43M (  1.30ns) (± 2.71%)  0.0B/op   1
 send via record callsites 384.89M (  2.60ns) (± 3.20%)  0.0B/op   1.00x slower
   send via proc callsites 220.40M (  4.54ns) (± 1.57%)  0.0B/op   1.75x slowerr
 </code></pre>
-
 <p>For all intents and purposes, when running code build with <code>--release</code>, the execution speed between the direct calls and the <code>#send</code> based calls is the same, when using <em>record</em> type callsites. It is somewhat slower when using <em>proc</em> type callsites, but the performance is still reasonably good.</p>
-
 <h2><a id="limitations" class="anchor" href="#limitations">
   <svg class="octicon-link" aria-hidden="true">
     <use href="#octicon-link"/>
   </svg>
 </a>Limitations</h2>
-
 <p>This approach currently has some significant limitations.</p>
-
 <h3><a id="methods-cant-be-sent-to-if-they-do-not-have-type-definitions" class="anchor" href="#methods-cant-be-sent-to-if-they-do-not-have-type-definitions">
   <svg class="octicon-link" aria-hidden="true">
     <use href="#octicon-link"/>
   </svg>
 </a>Methods can't be sent to if they do not have type definitions</h3>
-
 <p>First, it will not work automatically on any method which does not have a type definition. Crystal must expand macros into code before type inference runs, so arguments with no provided method types lack the information needed to build the callsites.</p>
-
 <p>This is because both of the techniques used to provide callsites, the use of <em>Proc</em> or the use of a <em>record</em>, require this type information. Proc arguments must have types, and will return a <code>Error: function argument ZZZ must have a type</code> if one is not provided. The <em>record</em> macro, on the other hand, builds instance variables for the arguments, which, again, require types to be provided at the time of declaration.</p>
-
 <p>A possible partial remediation that would allow one to retrofit the ability to use <code>send</code> with methods that aren't already defined with fully typing would be to enable the use of annotations to describe the type signature for the method. This would allow someone to reopen a class, attach type signatures to the methods that need them, and then include <code><a href="Send.html">Send</a></code> in the class to enable sending to those methods.</p>
-
 <h3><a id="methods-that-take-blocks-are-currently-unsupported" class="anchor" href="#methods-that-take-blocks-are-currently-unsupported">
   <svg class="octicon-link" aria-hidden="true">
     <use href="#octicon-link"/>
   </svg>
 </a>Methods that take blocks are currently unsupported</h3>
-
 <p>This can be supported. The code to do it is still just TODO.</p>
-
 <h3><a id="named-argument-support-is-flakey" class="anchor" href="#named-argument-support-is-flakey">
   <svg class="octicon-link" aria-hidden="true">
     <use href="#octicon-link"/>
   </svg>
 </a>Named argument support is flakey</h3>
-
 <p>Consider two method definitions:</p>
-
 <pre><code class="language-crystal"><span class="k">def</span> <span class="m">a</span>(b : <span class="t">Int32</span>)
   puts <span class="s">&quot;b is </span><span class="i">#{</span>b<span class="i">}</span><span class="s">&quot;</span>
 <span class="k">end</span>
@@ -231,35 +204,29 @@ send via record callsites 384.89M (  2.60ns) (± 3.20%)  0.0B/op   1.00x slower
 <span class="k">def</span> <span class="m">a</span>(c : <span class="t">Int32</span>)
   puts <span class="s">&quot;c is </span><span class="i">#{</span>c<span class="i">}</span><span class="s">&quot;</span>
 <span class="k">end</span></code></pre>
-
 <p>Only the last one defined, <code>a(c : Int32)</code>, will exist in the compiled code. So if you have different methods with the same type signatures, only the last one defined can be addressed using named arguments.</p>
-
 <p><span class="flag orange">TODO</span>  is to see if there is a way to leverage splats and double splats in the send implementation so that all argument handling just works the way that one would expect.</p>
-
 <h2><a id="installation" class="anchor" href="#installation">
   <svg class="octicon-link" aria-hidden="true">
     <use href="#octicon-link"/>
   </svg>
 </a>Installation</h2>
-
-<ol><li>Add the dependency to your <code>shard.yml</code>:</li></ol>
-
-<p><code></code>`yaml
-   dependencies:</p>
-
-<pre><code class="language-crystal"> send:
-   github: wyhaines/send.cr</code></pre>
-
-<p><code></code>`</p>
-
-<ol><li>Run <code>shards install</code></li></ol>
-
+<ol>
+<li>
+<p>Add the dependency to your <code>shard.yml</code>:</p>
+<pre><code class="language-yaml">dependencies:
+  send:
+    github: wyhaines/send.cr</code></pre>
+</li>
+<li>
+<p>Run <code>shards install</code></p>
+</li>
+</ol>
 <h2><a id="usage" class="anchor" href="#usage">
   <svg class="octicon-link" aria-hidden="true">
     <use href="#octicon-link"/>
   </svg>
 </a>Usage</h2>
-
 <pre><code class="language-crystal"><span class="k">require</span> <span class="s">&quot;send&quot;</span>
 
 <span class="k">class</span> <span class="t">Foo</span>
@@ -270,19 +237,13 @@ send via record callsites 384.89M (  2.60ns) (± 3.20%)  0.0B/op   1.00x slower
 <span class="k">end</span>
 
 <span class="t">Send</span>.activate</code></pre>
-
 <p>When <code><a href="Send.html">Send</a></code> is included into a class, it registers the class with the Send module, but does no other initialization. To complete initialization, insert a <code>Send.activate</code> after all method definitions on the class or struct have been completed. This will setup callsites for all methods that have been defined before that point, which have type definitions on their arguments. By default, this uses <em>record</em> callsites for everything. When compiled with <code>--release</code>, using <em>record</em> callsites is as fast as directly calling the method. If a method uses types that can not be used with an instance variable, but are otherwise legal method types, the <em>Proc</em> callsite type can be used instead.</p>
-
 <p>To specify that the entire class should use one callsite type or another, use an annotation on the class.</p>
-
 <pre><code class="language-crystal">@[<span class="t">SendViaProc</span>]
 <span class="k">class</span> <span class="t">Foo</span>
 <span class="k">end</span></code></pre>
-
 <p>The <code>@[<a href="SendViaRecord.html">SendViaRecord</a>]</code> annotation is also supported, but since that is the default, one should not need to use it at the class level.</p>
-
 <p>These same annotations can also be used on methods to specify the <code>send</code> behavior for a given method.</p>
-
 <pre><code class="language-crystal">@[<span class="t">SendViaProc</span>]
 <span class="k">class</span> <span class="t">Foo</span>
   <span class="k">def</span> <span class="m">abc</span>(n : <span class="t">Int32</span>)
@@ -294,9 +255,7 @@ send via record callsites 384.89M (  2.60ns) (± 3.20%)  0.0B/op   1.00x slower
     <span class="t">BigInt</span>.<span class="k">new</span>(x) <span class="o">**</span> <span class="t">BigInt</span>.<span class="k">new</span>(y)
   <span class="k">end</span>
 <span class="k">end</span></code></pre>
-
 <p>The <code>@[<a href="SendSkip.html">SendSkip</a>]</code> annotation can be used to indicate that a specific method should be skipped when building callsites for <em>#send</em>.</p>
-
 <pre><code class="language-crystal"><span class="k">class</span> <span class="t">Foo</span>
   <span class="k">def</span> <span class="m">abc</span>(n : <span class="t">Int32</span>)
     n <span class="o">**</span> n
@@ -307,33 +266,34 @@ send via record callsites 384.89M (  2.60ns) (± 3.20%)  0.0B/op   1.00x slower
     <span class="k">yield</span> x
   <span class="k">end</span>
 <span class="k">end</span></code></pre>
-
 <h2><a id="development" class="anchor" href="#development">
   <svg class="octicon-link" aria-hidden="true">
     <use href="#octicon-link"/>
   </svg>
 </a>Development</h2>
-
 <p>I am putting this here mostly as a note to myself, but the current approach is to iterate on the defined methods at the end of the class definition. It might be better if the code were included at the start of the class definition, since that is a pretty standard practice, and then to replace the iteration with a <code>method_added</code> hook that does all of the analysis and code generation for each method, one at a time.</p>
-
 <h2><a id="contributing" class="anchor" href="#contributing">
   <svg class="octicon-link" aria-hidden="true">
     <use href="#octicon-link"/>
   </svg>
 </a>Contributing</h2>
-
-<ol><li>Fork it (&lt;https://github.com/wyhaines/send/fork>)</li><li>Create your feature branch (<code>git checkout -b my-new-feature</code>)</li><li>Commit your changes (<code>git commit -am 'Add some feature'</code>)</li><li>Push to the branch (<code>git push origin my-new-feature</code>)</li><li>Create a new Pull Request</li></ol>
-
+<ol>
+<li>Fork it (<a href="https://github.com/wyhaines/send/fork">https://github.com/wyhaines/send/fork</a>)</li>
+<li>Create your feature branch (<code>git checkout -b my-new-feature</code>)</li>
+<li>Commit your changes (<code>git commit -am 'Add some feature'</code>)</li>
+<li>Push to the branch (<code>git push origin my-new-feature</code>)</li>
+<li>Create a new Pull Request</li>
+</ol>
 <h2><a id="contributors" class="anchor" href="#contributors">
   <svg class="octicon-link" aria-hidden="true">
     <use href="#octicon-link"/>
   </svg>
 </a>Contributors</h2>
-
-<ul><li><a href="https://github.com/wyhaines">Kirk Haines</a> - creator and maintainer</li></ul>
-
-<p><img src="https://img.shields.io/github/languages/code-size/wyhaines/Send.cr?style=for-the-badge" alt="GitHub code size in bytes"/>
-<img src="https://img.shields.io/github/issues/wyhaines/Send.cr?style=for-the-badge" alt="GitHub issues"/></p>
+<ul>
+<li><a href="https://github.com/wyhaines">Kirk Haines</a> - creator and maintainer</li>
+</ul>
+<p><img src="https://img.shields.io/github/languages/code-size/wyhaines/Send.cr?style=for-the-badge" alt="GitHub code size in bytes" />
+<img src="https://img.shields.io/github/issues/wyhaines/Send.cr?style=for-the-badge" alt="GitHub issues" /></p>
 </div>
 </body>
 </html>
