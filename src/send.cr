@@ -18,7 +18,7 @@ end
 #
 # Consider this program:
 #
-# ```crystal
+# ```
 # require "secret_sauce"
 #
 # class Foo
@@ -63,7 +63,7 @@ end
 #
 # In this example, SecretSauce is a proof of concept implementation:
 #
-# ```crystal
+# ```
 # module SecretSauce
 #   SendLookupInt32 = {
 #     "a": ->(obj : Foo, val : Int32) { obj.a(val) },
@@ -125,7 +125,7 @@ end
 #
 # Consider two method definitions:
 #
-# ```crystal
+# ```
 # def a(b : Int32)
 #   puts "b is #{b}"
 # end
@@ -153,11 +153,12 @@ end
 #
 # ## Usage
 #
-# ```crystal
+# ```
 # require "send"
 #
 # class Foo
 #   include Send
+#
 #   def abc(n : Int32)
 #     n * 123
 #   end
@@ -170,7 +171,7 @@ end
 #
 # To specify that the entire class should use one callsite type or another, use an annotation on the class.
 #
-# ```crystal
+# ```
 # @[SendViaProc]
 # class Foo
 # end
@@ -180,7 +181,7 @@ end
 #
 # These same annotations can also be used on methods to specify the `send` behavior for a given method.
 #
-# ```crystal
+# ```
 # @[SendViaProc]
 # class Foo
 #   def abc(n : Int32)
@@ -196,7 +197,7 @@ end
 #
 # The `@[SendSkip]` annotation can be used to indicate that a specific method should be skipped when building callsites for *#send*.
 #
-# ```crystal
+# ```
 # class Foo
 #   def abc(n : Int32)
 #     n ** n
@@ -210,7 +211,7 @@ end
 # ```
 
 module Send
-  VERSION = "0.2.0"
+  VERSION = "0.3.2"
 
   # This excption will be raised if 'send' is invoked for a method that
   # is not mapped.
@@ -218,52 +219,61 @@ module Send
 
   private Activated = [false]
 
-  # Constant lookup table for our punctuation conversions.
-  SendMethodPunctuationLookups = {
-    "LXESXS":        /\s*\<\s*/,
-    "EXQUALXS":      /\s*\=\s*/,
-    "EXXCLAMATIOXN": /\s*\!\s*/,
-    "TXILDXE":       /\s*\~\s*/,
-    "GXREATEXR":     /\s*\>\s*/,
-    "PXLUXS":        /\s*\+\s*/,
-    "MXINUXS":       /\s*\-\s*/,
-    "AXSTERISXK":    /\s*\*\s*/,
-    "SXLASXH":       /\s*\/\s*/,
-    "PXERCENXT":     /\s*\%\s*/,
-    "AXMPERSANXD":   /\s*\&\s*/,
-    "QXUESTIOXN":    /\s*\?\s*/,
-    "LXBRACKEXT":    /\s*\[\s*/,
-    "RXBRACKEXT":    /\s*\]\s*/,
-  }
-
   # This macros
   macro build_type_lookup_table(typ)
     {% type = typ.resolve %}
     # This lookup table stores an association of method call signature to method type union, encoded.
-    {{ type }}::Xtn::SendTypeLookupByLabel = {
+    {{ type.name(generic_args: false) }}::Xtn::SendTypeLookupByLabel = {
     {% for args in type.methods.map(&.args).uniq %}
       {{args.stringify}}: {{
-                                   args.reject do |arg|
-                                     arg.restriction.is_a?(Nop)
-                                   end.map do |arg|
-                                     arg.restriction.resolve.union? ? arg.restriction.resolve.union_types.map do |ut|
-                                       ut.id.gsub(/[)(]/, "").gsub(/ \| /, "_")
-                                     end.join("_") : arg.restriction.id.gsub(/ \| /, "_").id
-                                   end.join("__")
-                                 }},
+                            args.reject do |arg|
+                              arg.restriction.is_a?(Nop)
+                            end.map do |arg|                  
+                              !arg.restriction.is_a?(ProcNotation) &&
+                              !(arg.restriction.is_a?(Union) && arg.restriction.types.any? {|t| t.is_a?(ProcNotation)}) &&
+                              (arg.restriction.resolve? && arg.restriction.resolve?.union?) ?
+                                arg.restriction.resolve.union_types.map do |ut|
+                                  ut.id.gsub(/[)(\*]/, "").gsub(/ \| /, "_")
+                                end.join("_") :
+                                arg.restriction.id.gsub(/[)(,\s]/, "").gsub(/ \| /, "_").id
+                            end.join("__")
+                          }},
+    {% end %}
+    }
+
+    {{ type.name(generic_args: false) }}::Xtn::SendGenericsLookupByLabel = {
+    {% for args in type.methods.map(&.args).uniq %}
+      {%
+      generics = [] of Nil
+      generics += type.type_vars
+      args.reject do |arg|
+        arg.restriction.is_a?(Nop)
+      end.each do |arg|
+        arg.restriction.types.each do |restriction_type|
+          if restriction_type.is_a?(ProcNotation)
+            # NOP
+          elsif restriction_type.is_a?(Path)
+            # NOP
+          else
+            generics += restriction_type.type_vars
+          end
+        end
+      end
+      %}
+      {{args.stringify}}: {{ generics.id.gsub(/\[/, "(").gsub(/\]/, ")").stringify }},
     {% end %}
     }
 
     # This little table stores the arity of all of the methods, allowing this to be queried at runtime.
-    {{ type }}::Xtn::SendArity = Hash(String, Array(Range(Int32, Int32))).new {|h, k| h[k] = [] of Range(Int32, Int32)}
+    {{ type.name(generic_args: false) }}::Xtn::SendArity = Hash(String, Array(Range(Int32, Int32))).new {|h, k| h[k] = [] of Range(Int32, Int32)}
     {% for method in type.methods %}
       {% min = method.args.reject { |m| m.default_value ? true : m.default_value == nil ? true : false }.size %}
-      {{ type }}::Xtn::SendArity[{{ method.name.stringify }}] << Range.new({{ min }}, {{ method.args.size }})
+      {{ type.name(generic_args: false) }}::Xtn::SendArity[{{ method.name.stringify }}] << Range.new({{ min }}, {{ method.args.size }})
     {% end %}
 
     # This lookup table just captures all of the method names, both as *String* and as *Symbol*,
     # allowing runtime lookup of method names by string.
-    {{ type }}::Xtn::SendRespondsTo = {
+    {{ type.name(generic_args: false) }}::Xtn::SendRespondsTo = {
     {% for method in type.methods.map(&.name).uniq %}
       "{{ method }}": true,
     {% end %}
@@ -305,7 +315,7 @@ module Send
 
         combos.each do |combo|
           combo_string = combo.join("__").id
-          constant_name = "#{type}::Xtn::SendLookup___#{combo.map { |c| c.gsub(/[\(\)]/, "PXAREXN").gsub(/::/, "CXOLOXN") }.join("__").id}" # ameba:disable Style/VerboseBlock
+          constant_name = "#{type.name(generic_args: false)}::Xtn::SendLookup___#{combo.map { |c| c.gsub(/[\(\)]/, "PXAREXN").gsub(/::/, "CXOLOXN").gsub(/,\s*/, "CXPSXC").gsub(/\*/,"AXSTERISXK") }.join("__").id}" # ameba:disable Style/VerboseBlock
           type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.each do |method|
             if !method.annotation(SendSkip) && restriction == type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize]
               if method.annotation(SendViaProc)
@@ -327,50 +337,60 @@ module Send
                 "use_procs" => use_procs,
               }
               method_name = method.name
-              ::Send::SendMethodPunctuationLookups.each do |name, punct|
+              {
+                "lxesxs":        /\s*\<\s*/,
+                "exqualxs":      /\s*\=\s*/,
+                "exxclamatioxn": /\s*\!\s*/,
+                "txildxe":       /\s*\~\s*/,
+                "gxreatexr":     /\s*\>\s*/,
+                "pxluxs":        /\s*\+\s*/,
+                "mxinuxs":       /\s*\-\s*/,
+                "axsterisxk":    /\s*\*\s*/,
+                "sxlasxh":       /\s*\/\s*/,
+                "pxercenxt":     /\s*\%\s*/,
+                "axmpersanxd":   /\s*\&\s*/,
+                "qxuestioxn":    /\s*\?\s*/,
+                "lxbrackext":    /\s*\[\s*/,
+                "rxbrackext":    /\s*\]\s*/,
+                "bxaxr":         /\s*\|\s*/,
+                "cxarext":       /\s*\^\s*/,
+              }.each do |name, punct|
                 method_name = method_name.gsub(punct, name.stringify)
               end
-              src[constant_name][method.name.stringify] = "#{type}::Xtn::Send_#{method_name}_#{restriction.gsub(/::/, "CXOLOXN").id}"
+              src[constant_name][method.name.stringify] = "#{type.name(generic_args: false)}::Xtn::Send_#{method_name}_#{restriction.gsub(/::/, "CXOLOXN").gsub(/\*/,"AXSTERISXK").id}"
             end
           end
         end
       end
     %}
-    {{ type }}::Xtn::SendRawCombos = {{src.stringify.id}}
-    {{ type }}::Xtn::SendParameters = {{sends.stringify.id}}
-  end
 
-  macro build_lookup_constants(typ)
-    {% type = typ.resolve %}
-    {% combo_keys = type.constant(:Xtn).constant(:SendRawCombos).keys %}
-    {% for constant_name in combo_keys %}
-    {% hsh = type.constant(:Xtn).constant(:SendRawCombos)[constant_name] %}
+    # Build the callsite lookups.
+    {% for constant_name in src.keys %}
+    {% hsh = src[constant_name] %}
     {{ constant_name.id }} = {
       {% for method_name, callsite in hsh %}{{method_name}}: {{callsite.id}},
       {% end %}}{% end %}
-  end
 
-  # There are two approaches to providing callsites for invoking methods
-  # which are currently provided by this library. One approach is to create
-  # a bunch of Proc objects which wrap the method calls. The lookup tables
-  # can be used to find the correct Proc to call. The other approach is to
-  # create a set of `record`s which take the same argument set as the method
-  # that it maps to. A `call` method exists on the record, and when invoked,
-  # it calls the method using the arguments that were used to create the
-  # record.
-  #
-  # This macro builds the callsites to send methods to. It defaults to using
-  # record structs to implement the callsites, but if passed a `true` when the
-  # macro is invoked, it will build the callsite using a Proc instead. Callsites
-  # built with a record are as fast as direct method invocations, when compiled
-  # with `--release`, but they suffer from some type restrictions that the Proc
-  # method do not suffer from. Namely, there are some types, such as `Number`,
-  # which can be used in a type or type union on a Proc, but which can not be
-  # used on an instance variable, which record-type callsites use. However,
-  # dynamic dispatch using Proc-type callsites is slower than with record-type
-  # callsites.
-  macro build_callsites(typ)
-    {% type = typ.resolve %}
+    # There are two approaches to providing callsites for invoking methods
+    # which are currently provided by this library. One approach is to create
+    # a bunch of Proc objects which wrap the method calls. The lookup tables
+    # can be used to find the correct Proc to call. The other approach is to
+    # create a set of `record`s which take the same argument set as the method
+    # that it maps to. A `call` method exists on the record, and when invoked,
+    # it calls the method using the arguments that were used to create the
+    # record.
+    #
+    # This macro builds the callsites to send methods to. It defaults to using
+    # record structs to implement the callsites, but if passed a `true` when the
+    # macro is invoked, it will build the callsite using a Proc instead. Callsites
+    # built with a record are as fast as direct method invocations, when compiled
+    # with `--release`, but they suffer from some type restrictions that the Proc
+    # method do not suffer from. Namely, there are some types, such as `Number`,
+    # which can be used in a type or type union on a Proc, but which can not be
+    # used on an instance variable, which record-type callsites use. However,
+    # dynamic dispatch using Proc-type callsites is slower than with record-type
+    # callsites.
+
     {% use_procs = !type.annotations(SendViaProc).empty? %}
     {% for method in type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } } %}
       {%
@@ -378,55 +398,80 @@ module Send
         method_name = method.name
 
         safe_method_name = method_name
-        ::Send::SendMethodPunctuationLookups.each do |name, punct|
+        {
+          "lxesxs":        /\s*\<\s*/,
+          "exqualxs":      /\s*\=\s*/,
+          "exxclamatioxn": /\s*\!\s*/,
+          "txildxe":       /\s*\~\s*/,
+          "gxreatexr":     /\s*\>\s*/,
+          "pxluxs":        /\s*\+\s*/,
+          "mxinuxs":       /\s*\-\s*/,
+          "axsterisxk":    /\s*\*\s*/,
+          "sxlasxh":       /\s*\/\s*/,
+          "pxercenxt":     /\s*\%\s*/,
+          "axmpersanxd":   /\s*\&\s*/,
+          "qxuestioxn":    /\s*\?\s*/,
+          "lxbrackext":    /\s*\[\s*/,
+          "rxbrackext":    /\s*\]\s*/,
+          "bxaxr":         /\s*\|\s*/,
+          "cxarext":       /\s*\^\s*/,
+        }.each do |name, punct|
           safe_method_name = safe_method_name.gsub(punct, name.stringify)
         end
       %}
+      {{ type.class? ? "class".id : type.struct? ? "struct".id : type.module? ? "module".id : "struct".id }} {{ type }}
+      # Type vars: {{ type.type_vars }}
+      {%
+        generics = type.constant(:Xtn).constant(:SendGenericsLookupByLabel)[method.args.symbolize].id
+        generics = "".id if generics == "()"
+      %}
       {% if use_procs == true %}
-        {{ type }}::Xtn::Send_{{ safe_method_name }}_{{ type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize].gsub(/::/, "CXOLOXN").id }} = ->(obj : {{ type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
+        Xtn::Send_{{ safe_method_name }}_{{ type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize].gsub(/::/, "CXOLOXN").id }} = ->(obj : {{ type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
           obj.{{ method_name }}({{ method_args.map(&.name).join(", ").id }})
         end
       {% else %}
-        record {{ type }}::Xtn::Send_{{ safe_method_name }}_{{ type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize].gsub(/::/, "CXOLOXN").id }}, obj : {{ type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
+        record Xtn::Send_{{ safe_method_name }}_{{ type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize].gsub(/::/, "CXOLOXN").id }}{{ generics }}, obj : {{ type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
           def call
             obj.{{ method_name }}({{ method_args.map(&.name).join(", ").id }})
           end
         end
       {% end %}
+      end
     {% end %}
-  end
 
-  # Send needs to find the right method to call, in a world where type unions exist and are
-  # common. This may not be the right approach, but it is an approach, and it what I am starting
-  # with.
-  #
-  # The basic problem is that if, say, you have a method that takes a `String | Int32`, and you
-  # also have a method that takes only an `Int32`, you will end up with two overloaded `send`
-  # methods. If you try to send to the method that takes the union, using a `String`, it will
-  # work as expected. However, if you try to send to the method that takes the union, using an
-  # Int32, the `send` that takes Int32 will be called, and it needs to be able to find the
-  # method that takes the union type.
-  macro build_method_sends(typ)
-    {%
-      type = typ.resolve
-      class_use_procs = !type.annotations(SendViaProc).empty?
-      send_parameters = type.constant(:Xtn).constant(:SendParameters)
-    %}
-    {% for constant, hsh in send_parameters %}
+    # Send needs to find the right method to call, in a world where type unions exist and are
+    # common. This may not be the right approach, but it is an approach, and it what I am starting
+    # with.
+    #
+    # The basic problem is that if, say, you have a method that takes a `String | Int32`, and you
+    # also have a method that takes only an `Int32`, you will end up with two overloaded `send`
+    # methods. If you try to send to the method that takes the union, using a `String`, it will
+    # work as expected. However, if you try to send to the method that takes the union, using an
+    # Int32, the `send` that takes Int32 will be called, and it needs to be able to find the
+    # method that takes the union type.
+
+    {% class_use_procs = !type.annotations(SendViaProc).empty? %}
+    {% for constant, hsh in sends %}
     {% for signature, argn in hsh %}
     {%
       args = argn["args"]
-      upn = argn["use_procs"]
-      if upn == "Y"
+      if argn["use_procs"] == "Y"
         use_procs = true
-      elsif upn == "N"
+      elsif argn["use_procs"]== "N"
         use_procs = false
       else
         use_procs = class_use_procs
       end
     %}
 
-    {{ type.class? ? "class".id : type.struct? ? "struct".id : "module" }} {{ type }}
+    {%
+      # If you are reading the next line, you might think WTF? Me, too. Primitives like
+      # `Int32` and friends are structs. But, if you ask their TypeNode about that, they
+      # will deny it. I guess they are deep cover operatives, so until I know of something
+      # better, I am going to use this hack. The code will assume that if a TypeNode answers
+      # false to `class?`, `struct?`, and `module`?, that it is actually a deep cover struct.
+    %}
+    {{ type.class? ? "class".id : type.struct? ? "struct".id : type.module? ? "module".id : "struct".id }} {{ type }}
     def __send__(method : String, {{ signature.id }})
       begin
       {% if use_procs == true %}
@@ -491,7 +536,7 @@ module Send
   end
 
   macro included
-    {% ClassesToEnable << @type.name %}
+    {% ClassesToEnable << @type.name(generic_args: false) %}
 
     # The standard #responds_to? only takes a symbol, and Crystal doesn't permit
     # String => Symbol, so if one wants to determine if a method exists, where the
@@ -501,11 +546,15 @@ module Send
     # `runtime_responds_to?` should, effectively, work just like the builtin method,
     # but it can handle strings as well as symbols.
     def runtime_responds_to?(_method : String | Symbol)
-      {{ @type }}::Xtn::SendRespondsTo[_method.to_s.tr(":","")]? || false
+      {{ @type.resolve.name(generic_args: false) }}::Xtn::SendRespondsTo[_method.to_s.tr(":","")]? || false
     end
 
     def arity(_method : String | Symbol)
-      {{ @type }}::Xtn::SendArity[_method.to_s.tr(":","")]? || [(..)]
+      {{ @type.resolve.name(generic_args: false) }}::Xtn::SendArity[_method.to_s.tr(":","")]? || [(..)]
+    end
+
+    def methods
+      {{ @type.resolve.name(generic_args: false)}}::Xtn::SendRespondsTo.keys
     end
   end
 
@@ -517,9 +566,6 @@ module Send
       {% for klass in ClassesToEnable.uniq %}
         Send.build_type_lookup_table({{klass.id}})
         Send.build_type_lookups({{klass.id}})
-        Send.build_lookup_constants({{klass.id}})
-        Send.build_callsites({{klass.id}})
-        Send.build_method_sends({{klass.id}})
       {% end %}
     {% end %}
   end

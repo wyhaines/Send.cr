@@ -1,12 +1,12 @@
 name: send
-version: 0.2.0
+version: 0.3.2
 
 authors:
   - Kirk Haines <wyhaines@gmail.com>
 
 crystal: "*"
 
-license: MIT
+license: "Apache 2.0"
 
 development_dependencies:
   ameba:
