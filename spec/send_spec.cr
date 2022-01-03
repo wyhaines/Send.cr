@@ -72,8 +72,8 @@ describe Send do
   end
 
   it "can use annotations to specify whether to use a proc or a record callsite" do
-    TestObj::Xtn::Send_exponent_Int32__Int32.is_a?(Proc).should be_false
-    TestObj::Xtn::Send_exponent_Int32__Int32.is_a?(Class).should be_true
+    TestObj::Xtn::Send_exponent_Int32__Int32_false.is_a?(Proc).should be_false
+    TestObj::Xtn::Send_exponent_Int32__Int32_false.is_a?(Class).should be_true
     OtherTestObj::Xtn::Send_multimultiply_Int16_Int32_String__Int16_Int32_String.is_a?(Proc).should be_true
   end
 

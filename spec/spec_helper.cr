@@ -108,10 +108,10 @@ end
 
 # This doesn't work, yet, because we still don't support methods that accept blocks.
 # It is closer to working now, though. Generics are better supported.
-# @[SendViaProc]
-# class Hash(K, V)
-#   include Send
-# end
+@[SendViaProc]
+class Hash(K, V)
+  include Send
+end
 
 struct Int32
   include Send

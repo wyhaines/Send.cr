@@ -241,6 +241,12 @@ module Send
     {% end %}
     }
 
+    {{ type.name(generic_args: false) }}::Xtn::SendBlockArgLookupByLabel = {
+      {% for args in type.methods.map {|meth| {meth.args, meth.block_arg, meth.accepts_block? } }.uniq %}
+        {{args.stringify}}: {{ "#{args[1].id.gsub(/[)(,\s]/, "").id}_#{args[2].id}" }},
+      {% end %}
+  }
+
     {{ type.name(generic_args: false) }}::Xtn::SendGenericsLookupByLabel = {
     {% for args in type.methods.map(&.args).uniq %}
       {%
@@ -277,6 +283,7 @@ module Send
     {% for method in type.methods.map(&.name).uniq %}
       "{{ method }}": true,
     {% end %}
+    {% debug %}
     }
   end
 
@@ -357,7 +364,9 @@ module Send
               }.each do |name, punct|
                 method_name = method_name.gsub(punct, name.stringify)
               end
-              src[constant_name][method.name.stringify] = "#{type.name(generic_args: false)}::Xtn::Send_#{method_name}_#{restriction.gsub(/::/, "CXOLOXN").gsub(/\*/,"AXSTERISXK").id}"
+              src[constant_name][method.name.stringify] = "#{type.name(generic_args: false)}::Xtn::Send_#{method_name}_#{type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize].gsub(/::/, "CXOLOXN").id }#{ type.constant(:Xtn).constant(:SendBlockArgLookupByLabel)[{method.args, method.block_arg, method.accepts_block?}.symbolize].gsub(/[\|:>\-]/, "").id }"
+
+              #src[constant_name][method.name.stringify] = "#{type.name(generic_args: false)}::Xtn::Send_#{method_name}_#{restriction.gsub(/::/, "CXOLOXN").gsub(/\*/,"AXSTERISXK").id}"
             end
           end
         end
@@ -394,6 +403,12 @@ module Send
     {% use_procs = !type.annotations(SendViaProc).empty? %}
     {% for method in type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } } %}
       {%
+        method_block_arg = method.block_arg
+        if method_block_arg
+          method_block_arg = ", blk#{method_block_arg}".id
+        else
+          method_block_arg = "".id
+        end
         method_args = method.args
         method_name = method.name
 
@@ -421,16 +436,18 @@ module Send
       %}
       {{ type.class? ? "class".id : type.struct? ? "struct".id : type.module? ? "module".id : "struct".id }} {{ type }}
       # Type vars: {{ type.type_vars }}
+      # Block Arg: {{ method.block_arg }}
+      # Accepts Block: {{ method.accepts_block? }}
       {%
         generics = type.constant(:Xtn).constant(:SendGenericsLookupByLabel)[method.args.symbolize].id
         generics = "".id if generics == "()"
       %}
       {% if use_procs == true %}
-        Xtn::Send_{{ safe_method_name }}_{{ type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize].gsub(/::/, "CXOLOXN").id }} = ->(obj : {{ type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}) do
+        Xtn::Send_{{ safe_method_name }}_{{ type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize].gsub(/::/, "CXOLOXN").id }}{{ type.constant(:Xtn).constant(:SendBlockArgLookupByLabel)[{method.args, method.block_arg, method.accepts_block?}.symbolize].gsub(/[\|:>\-]/, "").id }} = ->(obj : {{ type.id }}{{ method_args.size > 0 ? ", ".id : "".id }}{{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}{{ method_block_arg }}) do
           obj.{{ method_name }}({{ method_args.map(&.name).join(", ").id }})
         end
       {% else %}
-        record Xtn::Send_{{ safe_method_name }}_{{ type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize].gsub(/::/, "CXOLOXN").id }}{{ generics }}, obj : {{ type.id }}, {{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }} do
+        record Xtn::Send_{{ safe_method_name }}_{{ type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize].gsub(/::/, "CXOLOXN").id }}{{ type.constant(:Xtn).constant(:SendBlockArgLookupByLabel)[{method.args, method.block_arg, method.accepts_block?}.symbolize].gsub(/[\|:>\-]/, "").id }}{{ generics }}, obj : {{ type.id }}{{ method_args.size > 0 ? ", ".id : "".id }}{{ method_args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ").id }}{{ method_block_arg }} do
           def call
             obj.{{ method_name }}({{ method_args.map(&.name).join(", ").id }})
           end
