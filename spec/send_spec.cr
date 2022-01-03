@@ -74,8 +74,27 @@ describe Send do
   it "can use annotations to specify whether to use a proc or a record callsite" do
     TestObj::Xtn::Send_exponent_Int32__Int32_false.is_a?(Proc).should be_false
     TestObj::Xtn::Send_exponent_Int32__Int32_false.is_a?(Class).should be_true
-    OtherTestObj::Xtn::Send_multimultiply_Int16_Int32_String__Int16_Int32_String.is_a?(Proc).should be_true
+    OtherTestObj::Xtn::Send_multimultiply_Int16_Int32_String__Int16_Int32_String_false.is_a?(Proc).should be_true
   end
+
+  # Some internal bits, like the implementation for `Int32`, exhibit a strange behavior when
+  # interrogating them to determine whether they are a class, module, or struct. Specifically,
+  # `Int32` is implemented as a struct, but when interrogated within macro code, the `TypeNode`
+  # anwers `false`  for all three things. So, the current implementation of `send` is just
+  # assuming that if all of the interrogation methods return false, that it is, in fact, a
+  # struct that is just shy about admitting it.
+  it "can do dynamic dispatch to some weird things, like Int32" do
+    1230.send(:trailing_zeros_count).should eq 1
+  end
+
+  # Other classes, like `Hash`, are just hard to wrap because they utilize both generics and
+  # methods that take block arguments, both explictly defined and implicitly defined.
+  # it "can dynamically dispatch to a wide range of Hash methods" do
+  #   h1 = { :a => 1, :b => 2, :c => 3 }
+  #   h2 = { :d => 4, :e => 5, :f => 6 }
+
+  #   h1.send("merge", h2).should eq({ :a => 1, :b => 2, :c => 3, :d => 4, :e => 5, :f => 6 })
+  # end
 
   # Named parameter support is unavoidably flakey in the current implementation.
   # Send can not overload to methods with the same type signature, but different parameter

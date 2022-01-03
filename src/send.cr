@@ -277,13 +277,17 @@ module Send
       {{ type.name(generic_args: false) }}::Xtn::SendArity[{{ method.name.stringify }}] << Range.new({{ min }}, {{ method.args.size }})
     {% end %}
 
-    # This lookup table just captures all of the method names, both as *String* and as *Symbol*,
-    # allowing runtime lookup of method names by string.
+    # This lookup table just captures all of the method names, allowing runtime lookup of method names by string.
     {{ type.name(generic_args: false) }}::Xtn::SendRespondsTo = {
-    {% for method in type.methods.map(&.name).uniq %}
+    {%
+      methods = type.methods.map(&.name)
+      type.ancestors.each do |ancestor|
+        methods += ancestor.methods.map(&.name)
+      end
+    %}
+    {% for method in methods.uniq.sort %}
       "{{ method }}": true,
     {% end %}
-    {% debug %}
     }
   end
 
@@ -365,8 +369,6 @@ module Send
                 method_name = method_name.gsub(punct, name.stringify)
               end
               src[constant_name][method.name.stringify] = "#{type.name(generic_args: false)}::Xtn::Send_#{method_name}_#{type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize].gsub(/::/, "CXOLOXN").id }#{ type.constant(:Xtn).constant(:SendBlockArgLookupByLabel)[{method.args, method.block_arg, method.accepts_block?}.symbolize].gsub(/[\|:>\-]/, "").id }"
-
-              #src[constant_name][method.name.stringify] = "#{type.name(generic_args: false)}::Xtn::Send_#{method_name}_#{restriction.gsub(/::/, "CXOLOXN").gsub(/\*/,"AXSTERISXK").id}"
             end
           end
         end
