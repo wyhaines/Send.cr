@@ -204,7 +204,7 @@ end
 #   end
 #
 #   @[SendSkip]
-#   def def(x)
+#   def def(x, &)
 #     yield x
 #   end
 # end
@@ -228,21 +228,19 @@ module Send
       {{args.stringify}}: {{
                             args.reject do |arg|
                               arg.restriction.is_a?(Nop)
-                            end.map do |arg|                  
+                            end.map do |arg|
                               !arg.restriction.is_a?(ProcNotation) &&
-                              !(arg.restriction.is_a?(Union) && arg.restriction.types.any? {|t| t.is_a?(ProcNotation)}) &&
-                              (arg.restriction.resolve? && arg.restriction.resolve?.union?) ?
-                                arg.restriction.resolve.union_types.map do |ut|
-                                  ut.id.gsub(/[)(\*]/, "").gsub(/ \| /, "_")
-                                end.join("_") :
-                                arg.restriction.id.gsub(/[)(,\s]/, "").gsub(/ \| /, "_").id
+                                !(arg.restriction.is_a?(Union) && arg.restriction.types.any? { |t| t.is_a?(ProcNotation) }) &&
+                                (arg.restriction.resolve? && arg.restriction.resolve?.union?) ? arg.restriction.resolve.union_types.map do |ut|
+                                ut.id.gsub(/[)(\*]/, "").gsub(/ \| /, "_")
+                              end.join("_") : arg.restriction.id.gsub(/[)(,\s]/, "").gsub(/ \| /, "_").id
                             end.join("__")
                           }},
     {% end %}
     }
 
     {{ type.name(generic_args: false) }}::Xtn::SendBlockArgLookupByLabel = {
-      {% for args in type.methods.map {|meth| {meth.args, meth.block_arg, meth.accepts_block? } }.uniq %}
+      {% for args in type.methods.map { |meth| {meth.args, meth.block_arg, meth.accepts_block?} }.uniq %}
         {{args.stringify}}: {{ "#{args[1].id.gsub(/[)(,\s]/, "").id}_#{args[2].id}" }},
       {% end %}
   }
@@ -250,21 +248,21 @@ module Send
     {{ type.name(generic_args: false) }}::Xtn::SendGenericsLookupByLabel = {
     {% for args in type.methods.map(&.args).uniq %}
       {%
-      generics = [] of Nil
-      generics += type.type_vars
-      args.reject do |arg|
-        arg.restriction.is_a?(Nop)
-      end.each do |arg|
-        arg.restriction.types.each do |restriction_type|
-          if restriction_type.is_a?(ProcNotation)
-            # NOP
-          elsif restriction_type.is_a?(Path)
-            # NOP
-          else
-            generics += restriction_type.type_vars
+        generics = [] of Nil
+        generics += type.type_vars
+        args.reject do |arg|
+          arg.restriction.is_a?(Nop)
+        end.each do |arg|
+          arg.restriction.types.each do |restriction_type|
+            if restriction_type.is_a?(ProcNotation)
+              # NOP
+            elsif restriction_type.is_a?(Path)
+              # NOP
+            else
+              generics += restriction_type.type_vars
+            end
           end
         end
-      end
       %}
       {{args.stringify}}: {{ generics.id.gsub(/\[/, "(").gsub(/\]/, ")").stringify }},
     {% end %}
@@ -326,9 +324,25 @@ module Send
 
         combos.each do |combo|
           combo_string = combo.join("__").id
-          constant_name = "#{type.name(generic_args: false)}::Xtn::SendLookup___#{combo.map { |c| c.gsub(/[\(\)]/, "PXAREXN").gsub(/::/, "CXOLOXN").gsub(/,\s*/, "CXPSXC").gsub(/\*/,"AXSTERISXK") }.join("__").id}" # ameba:disable Style/VerboseBlock
+          constant_name = "#{type.name(generic_args: false)}::Xtn::SendLookup___#{combo.map { |c| c.gsub(/[\(\)]/, "PXAREXN").gsub(/::/, "CXOLOXN").gsub(/,\s*/, "CXPSXC").gsub(/\*/, "AXSTERISXK") }.join("__").id}" # ameba:disable Style/VerboseBlock
           type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } }.each do |method|
             if !method.annotation(SendSkip) && restriction == type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize]
+              # A record callsite stores arguments as instance variables. Crystal forbids
+              # abstract classes (e.g. `Int`, `Number`) as instance-variable types, even
+              # when they are legal as method-argument restrictions. Detect that case and
+              # force a Proc callsite for the affected method.
+              method_needs_proc = method.args.any? do |arg|
+                arg_rest = arg.restriction
+                if arg_rest.is_a?(Nop) || arg_rest.is_a?(ProcNotation)
+                  false
+                elsif !arg_rest.resolve?
+                  false
+                elsif arg_rest.resolve.union?
+                  arg_rest.resolve.union_types.any? { |ut| ut.abstract? }
+                else
+                  arg_rest.resolve.abstract?
+                end
+              end
               if method.annotation(SendViaProc)
                 use_procs = "Y:"
               elsif method.annotation(SendViaRecord)
@@ -344,8 +358,9 @@ module Send
               end
               signature = method.args.map { |arg| "#{arg.name} : #{arg.restriction}" }.join(", ")
               sends[constant_name][combo_arg_sig] = {
-                "args"      => method.args.map(&.name).join(", "),
-                "use_procs" => use_procs,
+                "args"       => method.args.map(&.name).join(", "),
+                "use_procs"  => use_procs,
+                "needs_proc" => method_needs_proc ? "Y" : "N",
               }
               method_name = method.name
               {
@@ -368,7 +383,7 @@ module Send
               }.each do |name, punct|
                 method_name = method_name.gsub(punct, name.stringify)
               end
-              src[constant_name][method.name.stringify] = "#{type.name(generic_args: false)}::Xtn::Send_#{method_name}_#{type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize].gsub(/::/, "CXOLOXN").id }#{ type.constant(:Xtn).constant(:SendBlockArgLookupByLabel)[{method.args, method.block_arg, method.accepts_block?}.symbolize].gsub(/[\|:>\-]/, "").id }"
+              src[constant_name][method.name.stringify] = "#{type.name(generic_args: false)}::Xtn::Send_#{method_name}_#{type.constant(:Xtn).constant(:SendTypeLookupByLabel)[method.args.symbolize].gsub(/::/, "CXOLOXN").id}#{type.constant(:Xtn).constant(:SendBlockArgLookupByLabel)[{method.args, method.block_arg, method.accepts_block?}.symbolize].gsub(/[\|:>\-]/, "").id}"
             end
           end
         end
@@ -402,9 +417,24 @@ module Send
     # dynamic dispatch using Proc-type callsites is slower than with record-type
     # callsites.
 
-    {% use_procs = !type.annotations(SendViaProc).empty? %}
+    {% class_use_procs = !type.annotations(SendViaProc).empty? %}
     {% for method in type.methods.reject { |method| method.args.any? { |arg| arg.restriction.is_a?(Nop) } } %}
       {%
+        # Mirror the abstract-type check from the sends-map build: if any arg has an
+        # abstract restriction it can't be stored in a record ivar, so emit a Proc.
+        method_needs_proc = method.args.any? do |arg|
+          arg_rest = arg.restriction
+          if arg_rest.is_a?(Nop) || arg_rest.is_a?(ProcNotation)
+            false
+          elsif !arg_rest.resolve?
+            false
+          elsif arg_rest.resolve.union?
+            arg_rest.resolve.union_types.any? { |ut| ut.abstract? }
+          else
+            arg_rest.resolve.abstract?
+          end
+        end
+        use_procs = class_use_procs || method_needs_proc
         method_block_arg = method.block_arg
         if method_block_arg
           method_block_arg = ", blk#{method_block_arg}".id
@@ -474,9 +504,11 @@ module Send
     {% for signature, argn in hsh %}
     {%
       args = argn["args"]
-      if argn["use_procs"] == "Y"
+      if argn["needs_proc"] == "Y"
         use_procs = true
-      elsif argn["use_procs"]== "N"
+      elsif argn["use_procs"] == "Y"
+        use_procs = true
+      elsif argn["use_procs"] == "N"
         use_procs = false
       else
         use_procs = class_use_procs
@@ -573,7 +605,7 @@ module Send
     end
 
     def methods
-      {{ @type.resolve.name(generic_args: false)}}::Xtn::SendRespondsTo.keys
+      {{ @type.resolve.name(generic_args: false) }}::Xtn::SendRespondsTo.keys
     end
   end
 
